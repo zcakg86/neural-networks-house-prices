@@ -1,3 +1,6 @@
+import torch
+import torch.nn as nn
+
 class initialmodel(nn.Module):
     def __init__(self, sequence_dim, spatial_dim, property_dim, hidden_dim=64):
         super(initialmodel, self).__init__()

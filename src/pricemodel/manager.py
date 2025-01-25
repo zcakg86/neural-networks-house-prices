@@ -1,3 +1,10 @@
+from src.pricemodel.data import *
+from src.pricemodel.predictor import *
+from datetime import datetime
+import pickle
+import json
+
+
 class modelmanager:
     def __init__(self, model, processor, model_name="property_model"):
         self.model = model
@@ -128,7 +135,7 @@ def train_and_save_model(df, sequence_length=12, epochs = 10):
     sequences, spatial_features, property_features, targets, df = processor.prepare_data(df)
 
     # Create and train model
-    predictor = predictor(
+    predictor = price_predictor(
         sequence_dim=sequences.shape[2],
         spatial_dim=spatial_features.shape[1],
         property_dim=property_features.shape[1]

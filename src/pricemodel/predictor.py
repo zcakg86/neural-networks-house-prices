@@ -1,4 +1,5 @@
-class predictor:
+from src.pricemodel.models import *
+class price_predictor:
     def __init__(self, sequence_dim, spatial_dim, property_dim, hidden_dim=64):
         self.device = torch.device('mps' if torch.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu')
         self.model = initialmodel(

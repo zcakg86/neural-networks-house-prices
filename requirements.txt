@@ -1,4 +1,7 @@
+pandas
+numpy
 h3pandas
-pytorch
-sklearn
+torch
 pickle
+scikit-learn
+matplotlib
