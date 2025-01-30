@@ -1,4 +1,4 @@
-from src.pricemodel.data import *
+from src.pricemodel.processor import *
 from src.pricemodel.predictor import *
 from datetime import datetime
 import pickle
@@ -26,7 +26,7 @@ class modelmanager:
               'sequence_dim': self.model.model.lstm.input_size,
               'spatial_dim': next(self.model.model.spatial_net.parameters()).shape[1],
               'property_dim': next(self.model.model.property_net.parameters()).shape[1],
-              'hidden_dim': self.model.model.lstm.hidden_size
+              'hidden_dim': self.model.model.lstm.hidden_size,
         }
         # Save model state
         torch.save({
@@ -63,13 +63,14 @@ class modelmanager:
         with torch.no_grad():
             for seq, spat, prop, _ in loader:
                 # Access the underlying model through self.model.model
+                # Attach data to device
                 pred, _ = self.model.model(
                     seq.to(self.model.device),
                     spat.to(self.model.device),
                     prop.to(self.model.device)
                 )
+                # Execute
                 predictions.extend(pred.cpu().numpy())
-
         # Reshape predictions
         predictions = np.array(predictions).reshape(-1, 1)
 
@@ -77,20 +78,22 @@ class modelmanager:
         sequence_shape = sequences.shape
         dummy_sequence = np.zeros((predictions.shape[0], sequence_shape[2]))
         dummy_sequence[:, 0] = predictions.ravel()  # Put predictions in first column
-        predictions = self.processor.scalers['temporal'].inverse_transform(dummy_sequence)[:, 0]
-
+        predictions = self.processor.scalers['sequences'].inverse_transform(dummy_sequence)[:, 0]
+        print(predictions.shape)
         # Add predictions to dataframe
+        # Get existing dataframe
         df_with_pred = df.copy()
 
         # Initialize predicted_price column with NaN
         df_with_pred['predicted_price'] = pd.NA
 
+        # Not right
         # Calculate the correct indices for predictions
         start_idx = self.processor.sequence_length
         end_idx = start_idx + len(predictions)
 
-        # Assign predictions to the correct rows
-        df_with_pred.loc[df_with_pred.index[start_idx:end_idx], 'predicted_price'] = predictions
+        # Assign inverse log of predictions to the correct rows
+        df_with_pred.loc[df_with_pred.index[start_idx:end_idx], 'predicted_price'] = np.exp(predictions)
 
         # Add prediction error metrics where we have both actual and predicted prices
         mask = df_with_pred['predicted_price'].notna()
@@ -176,3 +179,29 @@ def train_and_save_model(df, sequence_length=12, epochs = 10):
 
     return manager, df_with_pred
 
+def load_saved_model_with_config(path_prefix):
+    """
+    Load saved model with configuration
+    """
+    # Load configuration
+    with open(f'{path_prefix}_config.json', 'r') as f:
+        config = json.load(f)
+
+    # Load processor
+    with open(f'{path_prefix}_processor.pkl', 'rb') as f:
+        processor = pickle.load(f)
+
+    # Initialize model with saved configuration
+    predictor = price_predictor(
+        sequence_dim=config['sequence_dim'],
+        spatial_dim=config['spatial_dim'],
+        property_dim=config['property_dim'],
+        hidden_dim=config['hidden_dim']
+    )
+
+    # Load state dictionaries
+    checkpoint = torch.load(f'{path_prefix}.pth')
+    predictor.model.load_state_dict(checkpoint['model_state_dict'])
+    predictor.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    return predictor, processor

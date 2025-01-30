@@ -11,7 +11,7 @@ class price_predictor:
         # Specify loss measure
         self.criterion = nn.MSELoss()
         # And Adam optimiser
-        self.optimizer = torch.optim.Adam(self.model.parameters())
+        self.optimizer = torch.optim.Adam(self.model.parameters(),lr=1e-4)
 
     def eval(self):
         self.model.eval()

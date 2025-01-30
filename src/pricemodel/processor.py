@@ -11,9 +11,10 @@ class data_processor:
     def __init__(self, sequence_length=5):
         self.sequence_length = sequence_length
         self.scalers = {
-            'temporal': StandardScaler(),
+            'sequences': StandardScaler(),
             'spatial': StandardScaler(),
-            'property': StandardScaler()}
+            'property': StandardScaler(),
+            'prices':StandardScaler()}
     # Function to prepare data
     def prepare_data(self, df):
         """
@@ -34,6 +35,7 @@ class data_processor:
         df['price_per_sqft'] = df['sale_price'] / df['sqft']
         df['month'] = df['sale_date'].dt.month
         df['year'] = df['sale_date'].dt.year
+        df['log_price']= np.log(df['sale_price'])
 
         # Calculate local market features
         df['local_avg_sqft'] = self._calculate_local_averages(df, 'sqft')
@@ -42,15 +44,16 @@ class data_processor:
         sequences, spatial_features, property_features, targets = self._create_sequences(df)
         # Scale the features
         sequences_reshaped = sequences.reshape(-1, sequences.shape[-1])
-        scaled_sequences = self.scalers['temporal'].fit_transform(sequences_reshaped)
+        scaled_sequences = self.scalers['sequences'].fit_transform(sequences_reshaped)
         scaled_sequences = scaled_sequences.reshape(sequences.shape)
         scaled_spatial = self.scalers['spatial'].fit_transform(spatial_features)
         scaled_property = self.scalers['property'].fit_transform(property_features)
+        # Scale the target
+        scaled_targets = self.scalers['prices'].fit_transform(targets.reshape(-1,1))
+        return scaled_sequences, scaled_spatial, scaled_property, scaled_targets, df
 
-        return scaled_sequences, scaled_spatial, scaled_property, targets, df
 
-
-    def _calculate_local_averages(self, df, column, radius_km=1):
+    def _calculate_local_averages(self, df, column, radius_km=2):
         """Calculate local averages within a radius"""
         # Should be for various time points
         from sklearn.neighbors import BallTree
@@ -75,10 +78,6 @@ class data_processor:
         property_features = []
         targets = []
 
-        # Define feature groups
-        price_features = ['sale_price', 'price_per_sqft', 'local_avg_price']
-        spatial_features_cols = ['lat', 'lng', 'local_avg_price', 'local_avg_sqft']
-        property_features_cols = ['sqft', 'sale_nbr','sqft_lot']
         # Sequence creation looks for comparable properties
         for i in range(len(df)):
             current_property = df.iloc[i]
@@ -96,7 +95,7 @@ class data_processor:
                     ).days
                     # append price, size and date difference from comparabpes to use as sequential feature.
                     seq_features.append([
-                        comp['sale_price'],
+                        comp['log_price'],
                         relative_size,
                         days_before
                     ])
@@ -106,7 +105,7 @@ class data_processor:
                 spat_feat = [
                     current_property['lat'],
                     current_property['lng'],
-                    comparables['sale_price'].median(),
+                    comparables['log_price'].median(),
                     comparables['sqft'].median()
                 ]
 
@@ -120,7 +119,7 @@ class data_processor:
                 sequences.append(seq_features)
                 spatial_features.append(spat_feat)
                 property_features.append(prop_feat)
-                targets.append(current_property['sale_price'])
+                targets.append(current_property['log_price'])
 
         return (np.array(sequences), np.array(spatial_features),
                 np.array(property_features), np.array(targets))
