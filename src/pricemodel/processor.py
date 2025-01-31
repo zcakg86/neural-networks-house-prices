@@ -15,6 +15,7 @@ class data_processor:
             'spatial': StandardScaler(),
             'property': StandardScaler(),
             'prices':StandardScaler()}
+        self.indices = []
     # Function to prepare data
     def prepare_data(self, df):
         """
@@ -41,7 +42,7 @@ class data_processor:
         df['local_avg_sqft'] = self._calculate_local_averages(df, 'sqft')
 
         # Create sequences and features
-        sequences, spatial_features, property_features, targets = self._create_sequences(df)
+        sequences, spatial_features, property_features, targets, self.indices = self._create_sequences(df)
         # Scale the features
         sequences_reshaped = sequences.reshape(-1, sequences.shape[-1])
         scaled_sequences = self.scalers['sequences'].fit_transform(sequences_reshaped)
@@ -77,6 +78,7 @@ class data_processor:
         spatial_features = []
         property_features = []
         targets = []
+        sequence_indices = []
 
         # Sequence creation looks for comparable properties
         for i in range(len(df)):
@@ -120,9 +122,10 @@ class data_processor:
                 spatial_features.append(spat_feat)
                 property_features.append(prop_feat)
                 targets.append(current_property['log_price'])
+                sequence_indices.append(i) 
 
         return (np.array(sequences), np.array(spatial_features),
-                np.array(property_features), np.array(targets))
+                np.array(property_features), np.array(targets), sequence_indices)
 
     def _find_comparable_properties(self, df, current_property, n_comparable=5,
                                     radius_km=2):

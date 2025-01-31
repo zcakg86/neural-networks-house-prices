@@ -54,11 +54,14 @@ class modelmanager:
         """Add model predictions to dataframe"""
         self.model.eval()
         predictions = []
+        prediction_indices = []
 
         # Create DataLoader for prediction
         dataset = maketensor(sequences, spatial_features, property_features,
                                   np.zeros(len(sequences)))  # dummy targets
         loader = DataLoader(dataset, batch_size=32)
+        
+        current_idx = 0
 
         with torch.no_grad():
             for seq, spat, prop, _ in loader:
@@ -70,7 +73,14 @@ class modelmanager:
                     prop.to(self.model.device)
                 )
                 # Execute
-                predictions.extend(pred.cpu().numpy())
+                batch_predictions = pred.cpu().numpy()
+                for i, p in enumerate(batch_predictions):
+                    if not np.isnan(p).any():  # Check if prediction was actually made
+                        predictions.append(p)
+                        prediction_indices.append(current_idx + i)
+                
+                current_idx += len(seq)
+
         # Reshape predictions
         predictions = np.array(predictions).reshape(-1, 1)
 
@@ -79,21 +89,29 @@ class modelmanager:
         dummy_sequence = np.zeros((predictions.shape[0], sequence_shape[2]))
         dummy_sequence[:, 0] = predictions.ravel()  # Put predictions in first column
         predictions = self.processor.scalers['sequences'].inverse_transform(dummy_sequence)[:, 0]
-        print(predictions.shape)
         # Add predictions to dataframe
         # Get existing dataframe
         df_with_pred = df.copy()
 
         # Initialize predicted_price column with NaN
+        df_with_pred['predicted_value'] = pd.NA
         df_with_pred['predicted_price'] = pd.NA
 
-        # Not right
-        # Calculate the correct indices for predictions
-        start_idx = self.processor.sequence_length
-        end_idx = start_idx + len(predictions)
-
-        # Assign inverse log of predictions to the correct rows
-        df_with_pred.loc[df_with_pred.index[start_idx:end_idx], 'predicted_price'] = np.exp(predictions)
+        # Create a mapping of sequence index to original dataframe index
+        # This should come from your data preparation step
+        if hasattr(self.processor, 'indices'):
+            sequence_to_df_idx = self.processor.indices
+            
+            # Map prediction indices to original dataframe indices
+            df_indices = [sequence_to_df_idx[i] for i in prediction_indices]
+            
+            # Assign predictions to the correct rows
+            df_with_pred.iloc[df_indices, df_with_pred.columns.get_loc('predicted_value')] = predictions
+            df_with_pred.iloc[df_indices, df_with_pred.columns.get_loc('predicted_price')] = np.exp(predictions)
+        else:
+            print("Warning: No index mapping found. Using sequential assignment.")
+            df_with_pred.iloc[prediction_indices, df_with_pred.columns.get_loc('predicted_value')] = predictions
+            df_with_pred.iloc[prediction_indices, df_with_pred.columns.get_loc('predicted_price')] = np.exp(predictions)
 
         # Add prediction error metrics where we have both actual and predicted prices
         mask = df_with_pred['predicted_price'].notna()
@@ -109,9 +127,8 @@ class modelmanager:
         # Print some debugging information
         print(f"Original dataframe shape: {df.shape}")
         print(f"Number of predictions: {len(predictions)}")
-        print(f"Predictions start index: {start_idx}")
-        print(f"Predictions end index: {end_idx}")
         print(f"Number of non-null predictions: {df_with_pred['predicted_price'].notna().sum()}")
+        print(f"Mean Absolute Percentage Error: {df_with_pred['price_error_pct'].abs().mean()}")
 
         return df_with_pred
 
