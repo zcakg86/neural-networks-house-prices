@@ -1,6 +1,6 @@
-01/29/2025
-Need to track indices in add_predictions_to_dataset function
 
-Need to filter training dataset to a limited area, then work on sequential and comparable settings
-(11 predictions from 500 observations)
+xNeed to track indices in add_predictions_to_dataset function. 
+xNeed to filter training dataset to a limited area
+Work on sequential and comparable settings to have option to have no sequences
+Convert BallTree to h3 Kring?
 

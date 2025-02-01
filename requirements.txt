@@ -2,6 +2,5 @@ pandas
 numpy
 h3pandas
 torch
-pickle
 scikit-learn
 matplotlib
