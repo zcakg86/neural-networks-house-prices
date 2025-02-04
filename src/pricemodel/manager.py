@@ -184,7 +184,7 @@ def train_and_save_model(df, sequence_length=12, epochs = 10):
     )
 
     # Analyze results
-    metrics = manager.analyze_results(df_with_pred)
+    #metrics = manager.analyze_results(df_with_pred)
 
     # Save everything
     manager.save_model()

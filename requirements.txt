@@ -4,3 +4,9 @@ h3pandas
 torch
 scikit-learn
 matplotlib
+panel
+watchfiles
+jupyter_bokeh
+ipykernel
+ipywidgets
+ipywidgets_bokeh

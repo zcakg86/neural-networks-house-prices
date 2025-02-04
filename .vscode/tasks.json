@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Open Panel in Simple Browser",
+            "command": "${input:openSimpleBrowser}",
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "openSimpleBrowser",
+            "type": "command",
+            "command": "simpleBrowser.show",
+            "args": [
+                "https://automatic-fishstick-v6696797xj7v3p466-5006.app.github.dev/"
+            ]
+        }
+    ]
+}
