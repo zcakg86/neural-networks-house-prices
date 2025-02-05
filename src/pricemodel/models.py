@@ -47,7 +47,10 @@ class initialmodel(nn.Module):
 
     def forward(self, sequences, spatial_features, property_features):
         # Process sequences/temporal features
+        mask = (sequences.sum(dim=2) != -3).float().unsqueeze(-1)  # [batch, seq_len, 1]
+        
         lstm_out, _ = self.lstm(sequences)
+        lstm_out = lstm_out * mask  # Zero out padded positions
 
         # Process spatial and property features
         spatial_out = self.spatial_net(spatial_features)

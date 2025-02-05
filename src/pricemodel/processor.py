@@ -37,12 +37,12 @@ class data_processor:
         df['month'] = df['sale_date'].dt.month
         df['year'] = df['sale_date'].dt.year
         df['log_price']= np.log(df['sale_price'])
-
-        # Calculate local market features
-        df['local_avg_sqft'] = self._calculate_local_averages(df, 'sqft')
-
+        
         # Create sequences and features
         sequences, spatial_features, property_features, targets, self.indices = self._create_sequences(df)
+        
+        print(sequences[12])
+        
         # Scale the features
         sequences_reshaped = sequences.reshape(-1, sequences.shape[-1])
         scaled_sequences = self.scalers['sequences'].fit_transform(sequences_reshaped)
@@ -52,27 +52,7 @@ class data_processor:
         # Scale the target
         scaled_targets = self.scalers['prices'].fit_transform(targets.reshape(-1,1))
         return scaled_sequences, scaled_spatial, scaled_property, scaled_targets, df
-
-
-    def _calculate_local_averages(self, df, column, radius_km=2):
-        """Calculate local averages within a radius"""
-        # Should be for various time points
-        from sklearn.neighbors import BallTree
-
-        # Create BallTree for efficient nearest neighbor search
-        tree = BallTree(np.radians(df[['lat', 'lng']]), metric='haversine')
-
-        # Find neighbors within radius
-        indices = tree.query_radius(np.radians(df[['lat', 'lng']]),
-                                    r=radius_km / 6371.0)  # Convert km to radians
-
-        # Calculate local averages
-        local_avgs = []
-        for idx_list in indices:
-            local_avgs.append(df[column].iloc[idx_list].mean())
-
-        return local_avgs
-
+    
     def _create_sequences(self, df):
         sequences = []
         spatial_features = []
@@ -86,7 +66,7 @@ class data_processor:
             comparables = self._find_comparable_properties(
                 df, current_property, self.sequence_length
             )
-            if comparables is not None:
+            if len(comparables)>0:
                 # Create sequence features
                 seq_features = []
                 for _, comp in comparables.iterrows():
@@ -101,82 +81,86 @@ class data_processor:
                         relative_size,
                         days_before
                     ])
+                if len(comparables)<self.sequence_length:
+                    for _ in range(len(comparables)+1,self.sequence_length+1):
+                        seq_features.append([-1,-1,-1])
+                    
+            else:
+                # If no comparables, create a null sequence
+                seq_features = [[-1, -1, -1]] * self.sequence_length
 
-                # Spatial features (static)
-                # also use comparables to create local spatial stats
-                spat_feat = [
-                    current_property['lat'],
-                    current_property['lng'],
-                    comparables['log_price'].median(),
-                    comparables['sqft'].median()
-                ]
+            # Spatial features (static)
+            # also use comparables to create local spatial stats
+            spat_feat = [
+                current_property['lat'],
+                current_property['lng'],
+                comparables['sqft'].median()
+            ]
 
-                # Property features (static)
-                prop_feat = [
-                    current_property['sqft'],
-                    current_property['sale_nbr'],
-                    current_property['sqft_lot']
-                ]
-
-                sequences.append(seq_features)
-                spatial_features.append(spat_feat)
-                property_features.append(prop_feat)
-                targets.append(current_property['log_price'])
-                sequence_indices.append(i) 
-
+            # Property features (static)
+            prop_feat = [
+                current_property['sqft'],
+                current_property['sale_nbr'],
+                current_property['sqft_lot']
+            ]
+            
+            sequences.append(seq_features)
+            spatial_features.append(spat_feat)
+            property_features.append(prop_feat)
+            targets.append(current_property['log_price'])
+            sequence_indices.append(i)
+        
         return (np.array(sequences), np.array(spatial_features),
                 np.array(property_features), np.array(targets), sequence_indices)
 
     def _find_comparable_properties(self, df, current_property, n_comparable=5,
-                                    radius_km=2):
-          """
-          Find comparable properties based on location and characteristics, for sequencing
-          """
-          from sklearn.neighbors import BallTree
+                                    radius_km=1):
+        """
+        Find comparable properties based on location and characteristics, for sequencing
+        """
+        from sklearn.neighbors import BallTree
 
-          # Create BallTree for spatial searching
-          tree = BallTree(np.radians(df[['lat', 'lng']]), metric='haversine')
+        # Create BallTree for spatial searching
+        tree = BallTree(np.radians(df[['lat', 'lng']]), metric='haversine')
 
-          # Find nearby properties. Search within radius and return observation index
-          nearby_indices = tree.query_radius(
-              np.radians([[current_property['lat'], current_property['lng']]]),
-              r=radius_km/6371.0
-          )[0]
+        # Find nearby properties. Search within radius and return observation index
+        nearby_indices = tree.query_radius(
+            np.radians([[current_property['lat'], current_property['lng']]]),
+            r=radius_km/6371.0
+        )[0]
 
-          # Find properties sold before current date
-          nearby_df = df.iloc[nearby_indices].copy()
-          prior_sales = nearby_df[
-              # comparable properties must have been sold before and in the last year.
-              (nearby_df['sale_date'] < current_property['sale_date'])
-              & ((nearby_df['sale_date'] - current_property['sale_date']).dt.days < 360)
-          ]
-          # If more than minimum comparables, keep comparables and calculate differences for measure
-          # similarity and return the n_comparable most similar
-          if len(prior_sales) >= n_comparable:
-              # Calculate similarity scores based on sqft
-              prior_sales['sqft_diff'] = abs(
-                  prior_sales['sqft'] - current_property['sqft']
-              ) / current_property['sqft']
+        # Find properties sold before current date
+        nearby_df = df.iloc[nearby_indices][['sale_date', 'sqft','log_price']].copy()
+        prior_sales = nearby_df[
+            # comparable properties must have been sold before and in the last year.
+            (nearby_df['sale_date'] < current_property['sale_date'])
+            & ((nearby_df['sale_date'] - current_property['sale_date']).dt.days < 360)
+        ]
+        # If more than minimum comparables, keep comparables and calculate differences for measure
+        # similarity and return the n_comparable most similar
+        if len(prior_sales) >= n_comparable:
+            # Calculate similarity scores based on sqft
+            prior_sales['sqft_diff'] = abs(
+                prior_sales['sqft'] - current_property['sqft']
+            ) / current_property['sqft']
 
-              # Sort by similarity and recency
-              prior_sales['days_diff'] = (
-                  current_property['sale_date'] - prior_sales['sale_date']
-              ).dt.days
+            # Sort by similarity and recency
+            prior_sales['days_diff'] = (
+                current_property['sale_date'] - prior_sales['sale_date']
+            ).dt.days
 
-              # Combine similarity scores (you can adjust weights)
-              prior_sales['similarity_score'] = (
-                  0.7 * prior_sales['sqft_diff'] +
-                  0.3 * prior_sales['days_diff'] / 365
-              )
+            # Combine similarity scores (you can adjust weights)
+            prior_sales['similarity_score'] = (
+                0.7 * prior_sales['sqft_diff'] +
+                0.3 * prior_sales['days_diff'] / 365
+            )
 
-              # Get most similar properties
-              comparables = prior_sales.nsmallest(
-                  n_comparable, 'similarity_score'
-              )
-
-              return comparables
-
-          return None
+            # Get most similar properties
+            comparables = prior_sales.nsmallest(
+                n_comparable, 'similarity_score'
+            )
+            return comparables
+        return prior_sales
           
 class maketensor(Dataset):
 # To Create tensors from sequences/features.

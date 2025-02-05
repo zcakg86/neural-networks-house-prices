@@ -13,7 +13,8 @@ def analyze_saved_model_features(model_path, processor_path):
 
     # Get model weights
     model_state = checkpoint['model_state_dict']
-
+    print(model_state)
+    pn.widgets.StaticText(name='Static Text', value=model_state)
     print("Analyzing model weights and architecture...")
 
     # 1. Analyze LSTM weights (sequence features)
@@ -30,24 +31,24 @@ def analyze_saved_model_features(model_path, processor_path):
 
     # 4. Get attention weights if saved in training history
     attention_history = checkpoint.get('results', {}).get('attention_weights', None)
-    print(attention_history)
+    pn.widgets.StaticText(name='Static Text', value=attention_history)
     
     # Create a figure object
     fig, axs = plt.subplots(2, 2, figsize=(15, 10))
     # Plot sequence feature importance
-    sequence_features = ['sale_price', 'price_per_sqft', 'local_avg_price']  # adjust based on your features
+    sequence_features = ['similar_log_price', 'similar_relative_size', 'similar_sale_days_prior']  # adjust based on your features
     axs[0, 0].bar(sequence_features, sequence_importance[:len(sequence_features)])
     axs[0, 0].set_title('Sequence Feature Importance')
     axs[0, 0].set_xticklabels(sequence_features, rotation=45)
 
     # Plot spatial feature importance
-    spatial_features = ['lat', 'lon', 'local_avg_price', 'local_avg_sqft']  # adjust based on your features
+    spatial_features = ['lat', 'lon', 'local_avg_sqft']  # adjust based on your features
     axs[0, 1].bar(spatial_features, spatial_importance[:len(spatial_features)])
     axs[0, 1].set_title('Spatial Feature Importance')
     axs[0, 1].set_xticklabels(spatial_features, rotation=45)
 
     # Plot property feature importance
-    property_features = ['sqft', 'sale_nbr', 'price_per_sqft']  # adjust based on your features
+    property_features = ['sqft', 'sale_nbr', 'sqft_lot']  # adjust based on your features
     axs[1, 0].bar(property_features, property_importance[:len(property_features)])
     axs[1, 0].set_title('Property Feature Importance')
     axs[1, 0].set_xticklabels(property_features, rotation=45)

@@ -168,8 +168,8 @@ def train_and_save_model(df, sequence_length=12, epochs = 10):
         dataset, [train_size, val_size]
     )
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=32)
+    train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=64)
 
     train_losses, val_losses = predictor.train(train_loader, val_loader, epochs = epochs)
 
@@ -177,18 +177,13 @@ def train_and_save_model(df, sequence_length=12, epochs = 10):
     manager = modelmanager(predictor, processor)
     manager.results['train_losses'] = train_losses
     manager.results['val_losses'] = val_losses
-
+    
+    # Save everything
+    manager.save_model()
     # Add predictions to data
     df_with_pred = manager.add_predictions_to_data(
         df, sequences, spatial_features, property_features
     )
-
-    # Analyze results
-    #metrics = manager.analyze_results(df_with_pred)
-
-    # Save everything
-    manager.save_model()
-
 
     # Save predictions to CSV
     df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
