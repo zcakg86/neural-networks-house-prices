@@ -152,7 +152,7 @@ class modelmanager:
 def train_and_save_model(df, sequence_length=12, epochs = 10):
     # Process data
     processor = data_processor(sequence_length=sequence_length)
-    sequences, spatial_features, property_features, targets, df = processor.prepare_data(df)
+    sequences, spatial_features, property_features, targets, df, sequence_lengths = processor.prepare_data(df)
 
     # Create and train model
     predictor = price_predictor(
@@ -161,7 +161,7 @@ def train_and_save_model(df, sequence_length=12, epochs = 10):
         property_dim=property_features.shape[1]
     )
     # Create data loaders and train
-    dataset = maketensor(sequences, spatial_features, property_features, targets)
+    dataset = maketensor(sequences, spatial_features, property_features, targets, sequence_lengths)
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(
@@ -181,15 +181,16 @@ def train_and_save_model(df, sequence_length=12, epochs = 10):
     # Save everything
     manager.save_model()
     # Add predictions to data
-    df_with_pred = manager.add_predictions_to_data(
-        df, sequences, spatial_features, property_features
-    )
+    # df_with_pred = manager.add_predictions_to_data(
+    #     df, sequences, spatial_features, property_features
+    # )
 
-    # Save predictions to CSV
-    df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
-                        index=False)
+    # # Save predictions to CSV
+    # df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
+    #                     index=False)
 
-    return manager, df_with_pred
+    # return manager, df_with_pred
+    return manager
 
 def load_saved_model_with_config(path_prefix):
     """

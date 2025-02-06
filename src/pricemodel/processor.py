@@ -39,19 +39,19 @@ class data_processor:
         df['log_price']= np.log(df['sale_price'])
         
         # Create sequences and features
-        sequences, spatial_features, property_features, targets, self.indices = self._create_sequences(df)
-        
-        print(sequences[12])
-        
+        sequences, spatial_features, property_features, targets, self.indices, sequence_lengths = self._create_sequences(df)
         # Scale the features
         sequences_reshaped = sequences.reshape(-1, sequences.shape[-1])
+
         scaled_sequences = self.scalers['sequences'].fit_transform(sequences_reshaped)
         scaled_sequences = scaled_sequences.reshape(sequences.shape)
         scaled_spatial = self.scalers['spatial'].fit_transform(spatial_features)
         scaled_property = self.scalers['property'].fit_transform(property_features)
         # Scale the target
         scaled_targets = self.scalers['prices'].fit_transform(targets.reshape(-1,1))
-        return scaled_sequences, scaled_spatial, scaled_property, scaled_targets, df
+        print(scaled_targets.shape)
+        print(scaled_targets.reshape(scaled_targets.shape[0]).shape)
+        return scaled_sequences, scaled_spatial, scaled_property, scaled_targets, df, sequence_lengths
     
     def _create_sequences(self, df):
         sequences = []
@@ -59,6 +59,8 @@ class data_processor:
         property_features = []
         targets = []
         sequence_indices = []
+        sequence_lengths = []
+        seq_features = []
 
         # Sequence creation looks for comparable properties
         for i in range(len(df)):
@@ -66,9 +68,10 @@ class data_processor:
             comparables = self._find_comparable_properties(
                 df, current_property, self.sequence_length
             )
-            if len(comparables)>0:
+            sequence_lengths.append(len(comparables))
+            if sequence_lengths[i]>0:
                 # Create sequence features
-                seq_features = []
+
                 for _, comp in comparables.iterrows():
                     # Price per sqft and other relative metrics
                     relative_size = comp['sqft'] / current_property['sqft']
@@ -81,13 +84,20 @@ class data_processor:
                         relative_size,
                         days_before
                     ])
-                if len(comparables)<self.sequence_length:
-                    for _ in range(len(comparables)+1,self.sequence_length+1):
-                        seq_features.append([-1,-1,-1])
+            else: 
+                desired_length = self.sequence_length
+                feature_size = 3
+
+            # Create an empty entry filled with zeros
+                empty_entry = np.zeros((1, desired_length, feature_size))
+                seq_features.append(empty_entry)
+            #     if len(comparables)<self.sequence_length:
+            #         for _ in range(len(comparables)+1,self.sequence_length+1):
+            #             seq_features.append([-1,-1,-1])
                     
-            else:
-                # If no comparables, create a null sequence
-                seq_features = [[-1, -1, -1]] * self.sequence_length
+            # else:
+            #     # If no comparables, create a null sequence
+            #     seq_features = [[-1, -1, -1]] * self.sequence_length
 
             # Spatial features (static)
             # also use comparables to create local spatial stats
@@ -111,7 +121,8 @@ class data_processor:
             sequence_indices.append(i)
         
         return (np.array(sequences), np.array(spatial_features),
-                np.array(property_features), np.array(targets), sequence_indices)
+                np.array(property_features), np.array(targets), 
+                np.array(sequence_indices), np.array(sequence_lengths))
 
     def _find_comparable_properties(self, df, current_property, n_comparable=5,
                                     radius_km=1):
@@ -164,11 +175,12 @@ class data_processor:
           
 class maketensor(Dataset):
 # To Create tensors from sequences/features.
-    def __init__(self, sequences, spatial_features, property_features, targets):
+    def __init__(self, sequences, spatial_features, property_features, targets, sequence_lengths):
         self.sequences = torch.FloatTensor(sequences)
         self.spatial_features = torch.FloatTensor(spatial_features)
         self.property_features = torch.FloatTensor(property_features)
         self.targets = torch.FloatTensor(targets)
+        self.sequence_lengths = torch.FloatTensor(sequence_lengths)
 
     def __len__(self):
         return len(self.targets)
@@ -177,4 +189,5 @@ class maketensor(Dataset):
         return (self.sequences[idx],
                 self.spatial_features[idx],
                 self.property_features[idx],
-                self.targets[idx])
+                self.targets[idx],
+                self.sequence_lengths[idx])

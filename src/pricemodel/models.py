@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 class initialmodel(nn.Module):
     def __init__(self, sequence_dim, spatial_dim, property_dim, hidden_dim=64):
@@ -45,13 +46,24 @@ class initialmodel(nn.Module):
             nn.Linear(hidden_dim, 1)
         )
 
-    def forward(self, sequences, spatial_features, property_features):
-        # Process sequences/temporal features
-        mask = (sequences.sum(dim=2) != -3).float().unsqueeze(-1)  # [batch, seq_len, 1]
-        
-        lstm_out, _ = self.lstm(sequences)
-        lstm_out = lstm_out * mask  # Zero out padded positions
+    def forward(self, sequences, spatial_features, property_features, sequence_lengths):
 
+        sequence_lengths, perm_idx = sequence_lengths.sort(0, descending=True)
+        sequences = sequences[perm_idx]
+
+        # Step 2: Pack the sequences
+        packed_sequences = pack_padded_sequence(sequences, sequence_lengths.cpu(), batch_first=True, enforce_sorted=True)
+
+        # Step 3: Process sequences with LSTM
+        packed_lstm_out, _ = self.lstm(packed_sequences)
+
+        # Step 4: Unpack the sequences
+        lstm_out, _ = pad_packed_sequence(packed_lstm_out, batch_first=True)
+
+        # Step 5: Restore the original order
+        _, unperm_idx = perm_idx.sort(0)
+        lstm_out = lstm_out[unperm_idx]
+        
         # Process spatial and property features
         spatial_out = self.spatial_net(spatial_features)
         property_out = self.property_net(property_features)
