@@ -5,3 +5,4 @@ Work on sequential and comparable settings to have option to have no sequences
 Convert BallTree to h3 Kring?
 Make attention weights retreivable
 Review all network layer types
+all .cpu to self.device()

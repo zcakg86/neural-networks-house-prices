@@ -30,8 +30,6 @@ class price_predictor:
                 property_feat = property_feat.to(self.device)
                 targets = targets.to(self.device)
                 sequence_lengths = sequence_lengths.to(self.device)
-                print(sequence_lengths)
-                print(sequences.shape)
                 self.optimizer.zero_grad()
                 predictions, _ = self.model(sequences, spatial, property_feat, sequence_lengths)
 

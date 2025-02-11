@@ -47,30 +47,49 @@ class initialmodel(nn.Module):
         )
 
     def forward(self, sequences, spatial_features, property_features, sequence_lengths):
-
-        sequence_lengths, perm_idx = sequence_lengths.sort(0, descending=True)
-        sequences = sequences[perm_idx]
-
-        # Step 2: Pack the sequences
-        packed_sequences = pack_padded_sequence(sequences, sequence_lengths.cpu(), batch_first=True, enforce_sorted=True)
-
-        # Step 3: Process sequences with LSTM
-        packed_lstm_out, _ = self.lstm(packed_sequences)
-
-        # Step 4: Unpack the sequences
-        lstm_out, _ = pad_packed_sequence(packed_lstm_out, batch_first=True)
-
-        # Step 5: Restore the original order
-        _, unperm_idx = perm_idx.sort(0)
-        lstm_out = lstm_out[unperm_idx]
+        print(sequences.shape)
+        lstm_out_placeholder = torch.zeros(sequences.shape[0],sequences.shape[1],self.lstm.hidden_size)
         
+        # Filter out non zero sequences with Mask
+        non_zero_mask = sequence_lengths > 0
+        filtered_sequences = sequences[non_zero_mask]
+        filtered_lengths = sequence_lengths[non_zero_mask]
+
+        filtered_lengths, perm_idx = filtered_lengths.sort(0, descending=True)
+        filtered_sequences = sequences[perm_idx]
+        if len(filtered_sequences) > 0:
+        # Step 2: Pack the sequences
+            packed_sequences = pack_padded_sequence(filtered_sequences, filtered_lengths.cpu(), batch_first=True, enforce_sorted=True)
+
+            # Step 3: Process sequences with LSTM
+            packed_lstm_out, _ = self.lstm(packed_sequences)
+
+            # Step 4: Unpack the sequences
+            lstm_out, _ = pad_packed_sequence(packed_lstm_out, batch_first=True)
+
+            # Step 5: Restore the original order
+            _, unperm_idx = perm_idx.sort(0)
+            lstm_out = lstm_out[unperm_idx]
+            print(lstm_out.shape)
+            print(lstm_out_placeholder.shape)
+            for i, length in enumerate(filtered_lengths):
+                lstm_out_placeholder[non_zero_mask.nonzero(as_tuple=True)[0][i], length.int() - 1, :] = lstm_out[i, length.int() - 1, :]
+
+        print(lstm_out_placeholder.shape)
+
         # Process spatial and property features
         spatial_out = self.spatial_net(spatial_features)
         property_out = self.property_net(property_features)
 
+        
         # Calculate attention weights
         spatial_expanded = spatial_out.unsqueeze(1).repeat(1, lstm_out.size(1), 1)
-        attention_input = torch.cat([lstm_out, spatial_expanded], dim=2)
+        print(spatial_expanded.shape)
+        # print(len(sequences))
+        # print(len(lstm_out))
+        # print(len(spatial_out))
+        # print(len(spatial_expanded))
+        attention_input = torch.cat([lstm_out_placeholder, spatial_expanded], dim=2)
         attention_weights = torch.softmax(self.attention(attention_input), dim=1)
 
         # Apply attention
