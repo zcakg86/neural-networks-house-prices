@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+from pytorch_forecasting.models.nn.rnn import LSTM
 
 class initialmodel(nn.Module):
     def __init__(self, sequence_dim, spatial_dim, property_dim, hidden_dim=64):
@@ -40,14 +41,14 @@ class initialmodel(nn.Module):
 
         # Final prediction layers
         self.predictor = nn.Sequential(
-            nn.Linear(hidden_dim * 3, hidden_dim),
+            nn.Linear(hidden_dim*2, hidden_dim),
             nn.ReLU(),
             nn.Dropout(0.2),
             nn.Linear(hidden_dim, 1)
         )
 
     def forward(self, sequences, spatial_features, property_features, sequence_lengths):
-        print(sequences.shape)
+        
         lstm_out_placeholder = torch.zeros(sequences.shape[0],sequences.shape[1],self.lstm.hidden_size)
         
         # Filter out non zero sequences with Mask
@@ -57,6 +58,7 @@ class initialmodel(nn.Module):
 
         filtered_lengths, perm_idx = filtered_lengths.sort(0, descending=True)
         filtered_sequences = sequences[perm_idx]
+        print(f'Number of non zero sequences: {len(filtered_sequences)}')
         if len(filtered_sequences) > 0:
         # Step 2: Pack the sequences
             packed_sequences = pack_padded_sequence(filtered_sequences, filtered_lengths.cpu(), batch_first=True, enforce_sorted=True)
@@ -70,35 +72,31 @@ class initialmodel(nn.Module):
             # Step 5: Restore the original order
             _, unperm_idx = perm_idx.sort(0)
             lstm_out = lstm_out[unperm_idx]
-            print(lstm_out.shape)
-            print(lstm_out_placeholder.shape)
+
             for i, length in enumerate(filtered_lengths):
                 lstm_out_placeholder[non_zero_mask.nonzero(as_tuple=True)[0][i], length.int() - 1, :] = lstm_out[i, length.int() - 1, :]
 
-        print(lstm_out_placeholder.shape)
-
         # Process spatial and property features
         spatial_out = self.spatial_net(spatial_features)
+        print(f'printing spatial output {spatial_out}')
         property_out = self.property_net(property_features)
 
-        
         # Calculate attention weights
         spatial_expanded = spatial_out.unsqueeze(1).repeat(1, lstm_out.size(1), 1)
-        print(spatial_expanded.shape)
         # print(len(sequences))
         # print(len(lstm_out))
         # print(len(spatial_out))
         # print(len(spatial_expanded))
         attention_input = torch.cat([lstm_out_placeholder, spatial_expanded], dim=2)
         attention_weights = torch.softmax(self.attention(attention_input), dim=1)
-
         # Apply attention
-        context_vector = torch.sum(lstm_out * attention_weights, dim=1)
+        context_vector = torch.sum(lstm_out_placeholder * attention_weights, dim=1)
 
         # Combine all features
         combined = torch.cat([context_vector, spatial_out, property_out], dim=1)
-
+        combined = torch.cat([spatial_out, property_out], dim=1)
         # Make prediction
         prediction = self.predictor(combined)
+        print(prediction)
 
         return prediction, attention_weights

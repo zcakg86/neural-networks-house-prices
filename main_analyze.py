@@ -1,5 +1,5 @@
 from src.pricemodel.analysis import *
-model = '20250131_172455'
+model = '20250211_144531'
 model_p = f'outputs/models/property_model_{model}.pth'
 proc_p = f'outputs/models/property_model_{model}_processor.pkl'
 

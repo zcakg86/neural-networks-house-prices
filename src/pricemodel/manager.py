@@ -50,7 +50,7 @@ class modelmanager:
 
         print(f"Model and results saved in {path}")
 
-    def add_predictions_to_data(self, df, sequences, spatial_features, property_features):
+    def add_predictions_to_data(self, df, sequences, spatial_features, property_features, sequence_lengths):
         """Add model predictions to dataframe"""
         self.model.eval()
         predictions = []
@@ -58,19 +58,20 @@ class modelmanager:
 
         # Create DataLoader for prediction
         dataset = maketensor(sequences, spatial_features, property_features,
-                                  np.zeros(len(sequences)))  # dummy targets
+                                  np.zeros(len(sequences)), sequence_lengths)  # dummy targets
         loader = DataLoader(dataset, batch_size=32)
         
         current_idx = 0
 
         with torch.no_grad():
-            for seq, spat, prop, _ in loader:
+            for seq, spat, prop, _, seq_len in loader:
                 # Access the underlying model through self.model.model
                 # Attach data to device
                 pred, _ = self.model.model(
                     seq.to(self.model.device),
                     spat.to(self.model.device),
-                    prop.to(self.model.device)
+                    prop.to(self.model.device),
+                    seq_len.to(self.model.device)
                 )
                 # Execute
                 batch_predictions = pred.cpu().numpy()
@@ -80,12 +81,13 @@ class modelmanager:
                         prediction_indices.append(current_idx + i)
                 
                 current_idx += len(seq)
-
+        print(f'Length of predictions {len(predictions)}')
         # Reshape predictions
         predictions = np.array(predictions).reshape(-1, 1)
 
         # Inverse transform using temporal_scaler
         sequence_shape = sequences.shape
+        print(predictions.shape[0])
         dummy_sequence = np.zeros((predictions.shape[0], sequence_shape[2]))
         dummy_sequence[:, 0] = predictions.ravel()  # Put predictions in first column
         predictions = self.processor.scalers['sequences'].inverse_transform(dummy_sequence)[:, 0]
@@ -177,19 +179,17 @@ def train_and_save_model(df, sequence_length=12, epochs = 10):
     manager = modelmanager(predictor, processor)
     manager.results['train_losses'] = train_losses
     manager.results['val_losses'] = val_losses
-    
+
     # Save everything
     manager.save_model()
     # Add predictions to data
-    # df_with_pred = manager.add_predictions_to_data(
-    #     df, sequences, spatial_features, property_features
-    # )
+    df_with_pred = manager.add_predictions_to_data(
+         df, sequences, spatial_features, property_features, sequence_lengths
+    )
 
     # # Save predictions to CSV
-    # df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
-    #                     index=False)
-
-    # return manager, df_with_pred
+    df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
+                        index=False)
     return manager
 
 def load_saved_model_with_config(path_prefix):

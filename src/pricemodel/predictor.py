@@ -44,13 +44,13 @@ class price_predictor:
             self.model.eval()
             val_loss = 0
             with torch.no_grad():
-                for sequences, spatial, property_feat, targets in val_loader:
+                for sequences, spatial, property_feat, targets, sequence_lengths in val_loader:
                     sequences = sequences.to(self.device)
                     spatial = spatial.to(self.device)
                     property_feat = property_feat.to(self.device)
                     targets = targets.to(self.device)
-
-                    predictions, _ = self.model(sequences, spatial, property_feat)
+                    sequence_lengths = sequence_lengths.to(self.device)
+                    predictions, _ = self.model(sequences, spatial, property_feat, sequence_lengths)
                     loss = self.criterion(predictions.squeeze(), targets.squeeze())
                     val_loss += loss.item()
 

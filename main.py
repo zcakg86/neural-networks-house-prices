@@ -3,6 +3,6 @@ pd.set_option('mode.chained_assignment', None)
 
 df = pd.read_csv('data/sales_2021_on_geo.csv')
 df = df[df['lat'].between(47.55,47.60) & df['lng'].between(-122.32,-122.30)]
-df = df.sample(n=10, random_state = 92)
+df = df.sample(n=100, random_state = 92)
 # manager, df_with_predictions = train_and_save_model(df,sequence_length=10, epochs = 5)
-manager = train_and_save_model(df,sequence_length=5, epochs = 1)
+manager = train_and_save_model(df,sequence_length=3, epochs = 1)

@@ -3,6 +3,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
 from src.pricemodel.models import *
+from pytorch_forecasting.data.timeseries import TimeSeriesDataSet
 
 
 # Class for working with data.
@@ -139,13 +140,15 @@ class data_processor:
         tree = BallTree(np.radians(df[['lat', 'lng']]), metric='haversine')
 
         # Find nearby properties. Search within radius and return observation index
-        nearby_indices = tree.query_radius(
+        nearby_indices, distance = tree.query_radius(
             np.radians([[current_property['lat'], current_property['lng']]]),
-            r=radius_km/6371.0
-        )[0]
+            r=radius_km/6371.0,
+            return_distance=True
+        )
 
         # Find properties sold before current date
-        nearby_df = df.iloc[nearby_indices][['sale_date', 'sqft','log_price']].copy()
+        nearby_df = df.iloc[nearby_indices[0]][['sale_date', 'sqft','log_price']].copy()
+        nearby_df['distance'] = distance[0]
         
         # Calculate date difference
         # Calculate date difference
@@ -161,8 +164,9 @@ class data_processor:
 
         # Combine similarity scores (you can adjust weights)
         nearby_df['similarity_score'] = (
-            0.7 * abs(nearby_df['sqft_diff']) +
-            0.3 * nearby_df['days_diff'] / 365
+            0.4 * abs(nearby_df['sqft_diff']) +
+            0.2 * nearby_df['days_diff'] / 365 +
+            0.4 * nearby_df['distance']
         )
         # If more than minimum comparables, keep comparables and calculate differences for measure
         # similarity and return the n_comparable most similar
@@ -173,7 +177,7 @@ class data_processor:
             )
             
             nearby_df = comparables
-        return nearby_df.iloc[:][['sale_date', 'sqft', 'log_price']]
+        return nearby_df.iloc[:][['sale_date', 'sqft', 'log_price', 'distance']]
           
 class maketensor(Dataset):
 # To Create tensors from sequences/features.
