@@ -10,3 +10,5 @@ jupyter_bokeh
 ipykernel
 ipywidgets
 ipywidgets_bokeh
+python-louvain
+contextily
