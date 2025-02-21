@@ -16,8 +16,8 @@ def h3_map(df, resolution, color):
     if df[color].dtype == 'object':
         colors = sns.color_palette("Paired",n_colors=len(df['h3_parent'].unique()))
         color_map = dict(zip(df['h3_parent'].unique(), colors))
-    else:
-        
+    else: # if continuous
+        color_map = sns.color_palette("bright")
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.set_aspect(1 / np.cos(np.radians(df['lat'].mean())))
     sns.scatterplot(data=df, x='lng', y='lat', hue='h3_parent', s=5, palette=color_map)
