@@ -12,3 +12,5 @@ ipywidgets
 ipywidgets_bokeh
 python-louvain
 contextily
+pytorch-forecasting
+seaborn

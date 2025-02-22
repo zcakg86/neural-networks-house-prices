@@ -16,16 +16,15 @@ def create_location_network(df, location_var=None):
     for location in df[location_var].unique():
         loc_data = df[df[location_var] == location]
         price_metrics = {
-            'mean_price': loc_data.groupby(pd.Grouper(key='sale_date', freq='ME'))['sale_price'].mean(),
-            'price_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='ME'))['sale_price'].std(),
-            'price_per_sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='ME'))['price_per_sqft'].mean(),
-            'price_per_sqft_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='ME'))['price_per_sqft'].std(),
-            'season_diff':loc_data.groupby(pd.Grouper(key='sale_date', freq='ME'))['sale_price'].mean().diff(),
-            'transaction_count': loc_data.groupby(pd.Grouper(key='sale_date', freq='ME'))['sale_price'].count(),
+            'mean_price': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_price'].mean(),
+            'price_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_price'].std(),
+            'price_per_sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['price_per_sqft'].mean(),
+            'price_per_sqft_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['price_per_sqft'].std(),
+            'season_diff':loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_price'].mean().diff(),
+            'transaction_count': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_price'].count(),
             'lng': loc_data['lng'].mean(),
             'lat': loc_data['lat'].mean()
         }
-    
         location_features[location] = price_metrics
         
     # Create graph
@@ -43,8 +42,8 @@ def create_location_network(df, location_var=None):
         loc_features = [
             location_features[loc]['mean_price'].mean(),
             location_features[loc]['price_std'].mean(),
-            location_features[loc]['price_per_sqft'].mean(),
-            location_features[loc]['transaction_count'].mean(),
+            #location_features[loc]['price_per_sqft'].mean(),
+            #location_features[loc]['transaction_count'].mean(),
             location_features[loc]['lat'],
             location_features[loc]['lng']
         ]
@@ -58,17 +57,20 @@ def create_location_network(df, location_var=None):
     features_df = pd.DataFrame(
         features_standardized, 
         index=locations,  # This keeps location codes as index
-        columns=['mean_price', 'price_std', 'price_per_sqft', 'count', 'lat', 'lng']
+        columns=['mean_price', 'price_std',
+                 # 'price_per_sqft', 'count',
+                  'lat', 'lng']
     )
 
     # Create edges using standardized features
     for loc1 in features_df.index:
         for loc2 in features_df.index[features_df.index > loc1]:  # More efficient way to avoid duplicates
             similarity = 1 / (1 + np.linalg.norm(features_df.loc[loc1] - features_df.loc[loc2]))
+            #print(loc2,'\n',similarity)
             if similarity > 0.1:
                 G.add_edge(loc1, loc2, weight=similarity)
     
-    return G, location_features
+    return G, location_features, features_df
 
 def detect_communities(G):
     """
@@ -133,7 +135,7 @@ def run_community_analysis(df, location_var):
     Complete execution example
     """
     print("Creating location network...")
-    G, location_features = create_location_network(df, location_var)
+    G, location_features, features_df = create_location_network(df, location_var)
     print(f"Network created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
     
     print("\nDetecting communities...")
@@ -143,7 +145,7 @@ def run_community_analysis(df, location_var):
     print("\nAnalyzing communities...")
     community_stats = analyze_communities(df, community_groups, location_var)
     
-    return G, communities, community_stats
+    return location_features, G, features_df, communities, community_stats, community_groups
 
 # # Example usage with sample data:
 # sample_data = pd.DataFrame({
