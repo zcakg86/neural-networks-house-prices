@@ -5,12 +5,16 @@ Analysis and model performance to be presented with Panel.
 
 # Aims
 Implement location-specific embedding through spatial features and community detection, that can estimate prices without bias across King County. 
+
 Provide accurate estimates throughout time.
+
 Deliver dashboard with panel that can be used to present market analysis found through the model weights.
 
 # Methods
 H3 Index for spatial representation
+
 Louvain graph based community detection
+
 Temporal embedding layer
 
 # Data
