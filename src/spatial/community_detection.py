@@ -14,20 +14,22 @@ def create_location_network(df, location_var=None):
     """
     # Calculate location-level features
     location_features = {}
+    print(f'Locations: {df[location_var].unique().shape}')
+
     for location in df[location_var].unique():
         loc_data = df[df[location_var] == location]
-        price_metrics = {
-            'mean_price': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_price'].mean(),
-            'price_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_price'].std(),
+        metrics = {
             'price_per_sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['price_per_sqft'].mean(),
-            'price_per_sqft_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['price_per_sqft'].std(),
-            'season_diff':loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_price'].mean().diff(),
-            'transaction_count': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_price'].count(),
+            'sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sqft'].mean(),
+            'sqft_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sqft'].std(),
+            'beds': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_nbr'].median(),
             'lng': loc_data['lng'].mean(),
             'lat': loc_data['lat'].mean()
         }
-        location_features[location] = price_metrics
-        
+        location_features[location] = metrics
+    print(list(location_features.values())[0:5])
+    print(list(location_features.keys())[0:5])
+
     # Create graph
     G = nx.Graph()
     # Add nodes
@@ -41,58 +43,63 @@ def create_location_network(df, location_var=None):
     for loc in locations:
         # Extract values from the nested dictionary/series
         loc_features = [
-            location_features[loc]['mean_price'].mean(),
-            location_features[loc]['price_std'].mean(),
             location_features[loc]['price_per_sqft'].mean(),
-            #location_features[loc]['transaction_count'].mean(),
-            #location_features[loc]['season_diff'].mean(),
-            location_features[loc]['lat'],
-            location_features[loc]['lng']
+            location_features[loc]['sqft'].mean()#,
+            # location_features[loc]['sqft_std'].mean(),
+            # location_features[loc]['beds'].mean(),
+            # location_features[loc]['lat'],
+            # location_features[loc]['lng']
         ]
         features_array.append(loc_features)
     
     # Convert to numpy array and standardize
     features_array = np.array(features_array)
-    print(features_array[0])
+    print(features_array[0:5])
     features_standardized = zscore(features_array, axis=0, nan_policy='omit')
-    print(features_standardized[0])
-
+    print(features_standardized[0:5])
     # Create DataFrame with location codes and standardized features
     features_df = pd.DataFrame(
         features_standardized, 
         index=locations,  # This keeps location codes as index
-        columns=['mean_price', 'price_std',
-                 'price_per_sqft', #'count',
-                 'lat', 'lng']
-                 #'season_diff',
+        columns=['price_per_sqft' ,'sqft' 
+                 #,'sqft_std', 'beds', 'lat', 'lng'
+                 #,season_diff'
+        ]
     )
 
     # Create edges using standardized features
     for loc1 in features_df.index:
         for loc2 in features_df.index[features_df.index > loc1]:  # More efficient way to avoid duplicates
             similarity = 1 / (1 + np.linalg.norm(features_df.loc[loc1] - features_df.loc[loc2]))
-            #print(loc2,'\n',similarity)
-            G.add_edge(loc1, loc2, weight=similarity)
+            if similarity >= 0.5:
+                G.add_edge(loc1, loc2, weight=similarity)
+            if loc1 in features_df.index[0:5] & loc2 in features_df.index[0:5]:
+                print(f'{loc1} and {loc2} similarity: {similarity}')
     
     return G, location_features, features_df, features_array
 
 
-def detect_communities(G, res=1):
+def detect_communities(G, method = 'gn', res=1):
     """
     Detects communities in the location network
     """
     # Use Louvain method for community detection
     print(f'Resolution: {res}')
-    communities = community.best_partition(G, resolution=res)
+    if method == 'gn':
+        communities = nx.community.girvan_newman(G,\
+                        max(G.edges.items(),
+                            key=lambda edge: edge[1]['weight'])[0])
+    elif method == 'l':
+        communities = nx.community.louvain_communities(G, resolution=res)
     
-    # Group locations by community
-    community_groups = {}
-    for node, community_id in communities.items():
-        if community_id not in community_groups:
-            community_groups[community_id] = []
-        community_groups[community_id].append(node)
+    # # Group locations by community
+    # community_groups = {}
+    # for node, community_id in communities:
+    #     if community_id not in community_groups:
+    #         community_groups[community_id] = []
+    #     community_groups[community_id].append(node)
     
-    return communities, community_groups
+    return communities#, community_groups
 
 def communities_df(input):
     '''Create datafame from dict'''
@@ -143,7 +150,7 @@ def analyze_communities(df, communities, location_var):
     return community_stats.reset_index(drop=True)
 
 # Example execution:
-def run_community_analysis(df, location_var, resolution):
+def run_community_analysis(df, location_var, method, resolution=None):
     """
     Complete execution example
     """
@@ -152,7 +159,7 @@ def run_community_analysis(df, location_var, resolution):
     print(f"Network created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
     
     print("\nDetecting communities...")
-    communities, community_groups = detect_communities(G, res = resolution)
+    communities, community_groups = detect_communities(G, method, resolution)
     print(f"Found {len(community_groups)} communities")
     
     print("\nAnalyzing communities...")
