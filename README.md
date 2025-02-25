@@ -15,5 +15,6 @@ Analysis and model performance to be presented with Panel.
 
 # Data
 Residential Sales data:\
-Andy Krause https://www.kaggle.com/datasets/andykrause/kingcountysales/data kingco_sales.csv\
-Data produced from data provided by the King County Department of Assessments.
+Andy Krause https://www.kaggle.com/datasets/andykrause/kingcountysales/data Version 8: kingco_sales.csv\
+Data produced from property assessment data made available by the King County Department of Assessments.\
+See https://github.com/andykrause/kingCoData
