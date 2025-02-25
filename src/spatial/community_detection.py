@@ -1,3 +1,4 @@
+#%%
 import pandas as pd
 import networkx as nx
 import community  # python-louvain
@@ -42,24 +43,28 @@ def create_location_network(df, location_var=None):
         loc_features = [
             location_features[loc]['mean_price'].mean(),
             location_features[loc]['price_std'].mean(),
-            #location_features[loc]['price_per_sqft'].mean(),
+            location_features[loc]['price_per_sqft'].mean(),
             #location_features[loc]['transaction_count'].mean(),
+            #location_features[loc]['season_diff'].mean(),
             location_features[loc]['lat'],
             location_features[loc]['lng']
         ]
         features_array.append(loc_features)
-
+    
     # Convert to numpy array and standardize
     features_array = np.array(features_array)
-    features_standardized = zscore(features_array, axis=0)
+    print(features_array[0])
+    features_standardized = zscore(features_array, axis=0, nan_policy='omit')
+    print(features_standardized[0])
 
     # Create DataFrame with location codes and standardized features
     features_df = pd.DataFrame(
         features_standardized, 
         index=locations,  # This keeps location codes as index
         columns=['mean_price', 'price_std',
-                 # 'price_per_sqft', 'count',
-                  'lat', 'lng']
+                 'price_per_sqft', #'count',
+                 'lat', 'lng']
+                 #'season_diff',
     )
 
     # Create edges using standardized features
@@ -67,17 +72,18 @@ def create_location_network(df, location_var=None):
         for loc2 in features_df.index[features_df.index > loc1]:  # More efficient way to avoid duplicates
             similarity = 1 / (1 + np.linalg.norm(features_df.loc[loc1] - features_df.loc[loc2]))
             #print(loc2,'\n',similarity)
-            if similarity > 0.1:
-                G.add_edge(loc1, loc2, weight=similarity)
+            G.add_edge(loc1, loc2, weight=similarity)
     
-    return G, location_features, features_df
+    return G, location_features, features_df, features_array
 
-def detect_communities(G):
+
+def detect_communities(G, res=1):
     """
     Detects communities in the location network
     """
     # Use Louvain method for community detection
-    communities = community.best_partition(G)
+    print(f'Resolution: {res}')
+    communities = community.best_partition(G, resolution=res)
     
     # Group locations by community
     community_groups = {}
@@ -87,6 +93,13 @@ def detect_communities(G):
         community_groups[community_id].append(node)
     
     return communities, community_groups
+
+def communities_df(input):
+    '''Create datafame from dict'''
+    df = pd.DataFrame([(k, i) for k, v in input.items() for i in v], 
+                      columns=['community', 'h3_index'])
+    return df
+    
 
 def analyze_communities(df, communities, location_var):
     """
@@ -130,22 +143,22 @@ def analyze_communities(df, communities, location_var):
     return community_stats.reset_index(drop=True)
 
 # Example execution:
-def run_community_analysis(df, location_var):
+def run_community_analysis(df, location_var, resolution):
     """
     Complete execution example
     """
     print("Creating location network...")
-    G, location_features, features_df = create_location_network(df, location_var)
+    G, location_features, features_df, array = create_location_network(df, location_var)
     print(f"Network created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
     
     print("\nDetecting communities...")
-    communities, community_groups = detect_communities(G)
+    communities, community_groups = detect_communities(G, res = resolution)
     print(f"Found {len(community_groups)} communities")
     
     print("\nAnalyzing communities...")
     community_stats = analyze_communities(df, community_groups, location_var)
     
-    return location_features, G, features_df, communities, community_stats, community_groups
+    return location_features, G, features_df, array, communities, community_stats, community_groups
 
 # # Example usage with sample data:
 # sample_data = pd.DataFrame({
@@ -161,3 +174,5 @@ def run_community_analysis(df, location_var):
 # G, communities, stats = run_community_analysis(sample_data, location_var = 'location')
 # print("\nCommunity Statistics:")
 # print(stats)
+
+# %%

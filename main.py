@@ -4,15 +4,23 @@ from src.pricemodel.manager import *
 pd.set_option('mode.chained_assignment', None)
 from src.spatial.geotools import *
 from src.spatial.community_detection import *
-df = pd.read_csv('data/sales_2021_on_geo.csv')
-
+df = pd.read_csv('data/sales_2020_25.csv')
 df = df[df['lat'].between(47.55,47.65) & df['lng'].between(-122.35,-122.25)]
 df['price_per_sqft']=df['sale_price']/df['sqft']
 df['sale_date']=pd.to_datetime(df['sale_date'])
-df['h3_parent'] = vectorized_get_parent_h3(df['h3_10'], 7)
 
-#h3_features, G, communities, stats, groups = run_community_analysis(df, location_var = 'h3_parent')
-location_features, G, features_df, communities, community_stats, community_groups = run_community_analysis(df, location_var = 'h3_parent')
+#%%
+df = df[df['lat'].between(47.55,47.65) & df['lng'].between(-122.35,-122.25)]
+
+cols_to_drop = df.columns[df.columns.str.contains('community|h3_index')]
+df.drop(cols_to_drop, axis = 1, inplace = True)
+location_features, G, features_df, array, communities, community_stats, \
+    community_groups = run_community_analysis(df, location_var = 'h3_07', resolution = 0.3)
+
+c_df = communities_df(community_groups)
+df = df.merge(c_df, left_on = 'h3_07', right_on = 'h3_index')
+h3_map(df, color ='community')
+#%%
 #print("\nCommunity Statistics:")
 #print(stats)
 #df = df.sample(n=100, random_state = 92)

@@ -3,13 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import h3
+import h3pandas
 import contextily as ctx
 
 def vectorized_get_parent_h3(series, target_res):
     return series.map(lambda x: h3.cell_to_parent(x, target_res))
 
 def h3_map(df, color):
-    "Draw map with "
+    "Draw chloropleth based on 'color'"
     if color is None:
         color = 'h3_parent'
     
@@ -20,7 +21,8 @@ def h3_map(df, color):
         color_map = sns.color_palette("bright")
     fig, ax = plt.subplots(figsize=(10, 10))
     ax.set_aspect(1 / np.cos(np.radians(df['lat'].mean())))
-    sns.scatterplot(data=df, x='lng', y='lat', hue=color, s=5, palette=color_map)
+    sns.scatterplot(data=df, x='lng', y='lat', hue=color, s=5, palette=color_map,
+                     legend = False)
         
     # Convert lat/lon to Web Mercator projection
     ax.set_xlim(df['lng'].min(), df['lng'].max())
