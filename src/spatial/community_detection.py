@@ -1,7 +1,7 @@
 #%%
 import pandas as pd
 import networkx as nx
-import community  # python-louvain
+from community import best_partition # python-louvain
 import numpy as np
 from scipy.stats import zscore
 
@@ -14,7 +14,7 @@ def create_location_network(df, location_var=None):
     """
     # Calculate location-level features
     location_features = {}
-    print(f'Locations: {df[location_var].unique().shape}')
+    print(f'Locations: {df[location_var].unique().shape[0]}')
 
     for location in df[location_var].unique():
         loc_data = df[df[location_var] == location]
@@ -27,8 +27,6 @@ def create_location_network(df, location_var=None):
             'lat': loc_data['lat'].mean()
         }
         location_features[location] = metrics
-    print(list(location_features.values())[0:5])
-    print(list(location_features.keys())[0:5])
 
     # Create graph
     G = nx.Graph()
@@ -54,9 +52,7 @@ def create_location_network(df, location_var=None):
     
     # Convert to numpy array and standardize
     features_array = np.array(features_array)
-    print(features_array[0:5])
     features_standardized = zscore(features_array, axis=0, nan_policy='omit')
-    print(features_standardized[0:5])
     # Create DataFrame with location codes and standardized features
     features_df = pd.DataFrame(
         features_standardized, 
@@ -66,15 +62,12 @@ def create_location_network(df, location_var=None):
                  #,season_diff'
         ]
     )
-
     # Create edges using standardized features
     for loc1 in features_df.index:
         for loc2 in features_df.index[features_df.index > loc1]:  # More efficient way to avoid duplicates
             similarity = 1 / (1 + np.linalg.norm(features_df.loc[loc1] - features_df.loc[loc2]))
             if similarity >= 0.5:
                 G.add_edge(loc1, loc2, weight=similarity)
-            if loc1 in features_df.index[0:5] & loc2 in features_df.index[0:5]:
-                print(f'{loc1} and {loc2} similarity: {similarity}')
     
     return G, location_features, features_df, features_array
 
@@ -83,23 +76,60 @@ def detect_communities(G, method = 'gn', res=1):
     """
     Detects communities in the location network
     """
+    def most_central_edge(G):
+        centrality = nx.edge_betweenness_centrality(G, weight="weight")
+        return max(centrality, key=centrality.get)
     # Use Louvain method for community detection
     print(f'Resolution: {res}')
     if method == 'gn':
-        communities = nx.community.girvan_newman(G,\
-                        max(G.edges.items(),
-                            key=lambda edge: edge[1]['weight'])[0])
+
+        communities_generator = nx.community.girvan_newman(G, most_valuable_edge=most_central_edge)
+        # Convert generator to list of tuples for multiple uses
+        # Each tuple contains sets of nodes representing communities
+        community_list = []
+        modularity_scores = []
+        
+        # Evaluate each division
+        for communities in communities_generator:
+            # Convert communities to list of sets for modularity calculation
+            communities = tuple(sorted(c) for c in communities)
+            community_list.append(communities)
+            
+            # Calculate modularity score
+            mod_score = nx.community.modularity(G, communities)
+            modularity_scores.append(mod_score)
+            
+            # Optional: stop if we have too many communities
+            if len(communities) > len(G.nodes) / 5:  # or some other threshold
+                break
+        
+        # Find best division
+        best_idx = np.argmax(modularity_scores)
+        best_communities = community_list[best_idx]
+        
+        print(f"Best modularity score: {modularity_scores[best_idx]}")
+        print(f"Number of communities: {len(best_communities)}")
+
     elif method == 'l':
-        communities = nx.community.louvain_communities(G, resolution=res)
+        best_communities = nx.community.louvain_communities(G, resolution=res)
+        print(best_communities)
+    # Create a dictionary mapping nodes to their community
+    community_dict = {}
+    for i, community in enumerate(best_communities):
+        for node in community:
+            community_dict[node] = i
     
-    # # Group locations by community
-    # community_groups = {}
-    # for node, community_id in communities:
-    #     if community_id not in community_groups:
-    #         community_groups[community_id] = []
-    #     community_groups[community_id].append(node)
+    # Create summary of communities
+    community_summary = pd.DataFrame({
+        'community': community_dict.values(),
+        'location': community_dict.keys()
+    }).groupby('community').agg(
+        locations=('location', list),
+        size=('location', 'size')
+    ).sort_values('size', ascending=False)
     
-    return communities#, community_groups
+    return community_dict, community_summary
+
 
 def communities_df(input):
     '''Create datafame from dict'''

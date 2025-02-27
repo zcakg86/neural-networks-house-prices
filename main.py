@@ -19,8 +19,8 @@ df = df.h3.geo_to_h3(resolution = 8, lat_col = 'lat', lng_col = 'lng',
 #%% 
 cols_to_drop = df.columns[df.columns.str.contains('community|h3_index')]
 df.drop(cols_to_drop, axis = 1, inplace = True)
-
-def run_community_analysis(df, location_var, method, resolution=None):
+#%%
+def run_community_analysis(df, location_var, method, resolution=1):
     """
     Complete execution example
     """
@@ -29,21 +29,31 @@ def run_community_analysis(df, location_var, method, resolution=None):
     print(f"Network created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
     
     print("\nDetecting communities...")
-    communities = detect_communities(G, method, resolution)
-    print(f"Found {len(community_groups)} communities")
+    communities, summary = detect_communities(G, method, resolution)
 
-    return location_features, communities
-locations, communities = run_community_analysis(df, location_var = 'h3_08', method = 'gn')
+    #print(f"Found {len(community_groups)} communities")
 
-
-#location_features, G, features_df, array, communities, community_stats, \
-#    community_groups = run_community_analysis(df, location_var = 'h3_08', method = 'gn', resolution = 0.3)
+    return location_features, communities, summary
 #%%
-c_df = communities_df(community_groups)
-df = df.merge(c_df, left_on = 'h3_08', right_on = 'h3_index')
+locations, communities, community_summary = run_community_analysis(df, location_var = 'h3_08', method = 'gn')
+df['community'] = df['h3_08'].map(communities)
+
+#%%
+locations_l, communities_l, summary_l = run_community_analysis(df, location_var = 'h3_08', method = 'l')
+df['community_l'] = df['h3_08'].map(communities)
+
+#%%
+c_df = communities_df(communities)
+#%%
+#%%
 h3_map(df, color ='community')
 #%%
-#print("\nCommunity Statistics:")
+h3_map(df, color ='sale_price',group_by='community')
+
+#%%
+h3_map(df, color ='sale_price',group_by='community_l')
+
+#print("\nCommunity Statistics:1")
 #print(stats)
 #df = df.sample(n=100, random_state = 92)
 #print(df.columns)
