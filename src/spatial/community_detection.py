@@ -19,8 +19,8 @@ def create_location_network(df, location_var=None):
     for location in df[location_var].unique():
         loc_data = df[df[location_var] == location]
         metrics = {
-            'price_per_sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['price_per_sqft'].mean(),
-            'sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sqft'].mean(),
+            'price_per_sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['price_per_sqft'].median(),
+            'sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sqft'].median(),
             'sqft_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sqft'].std(),
             'beds': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_nbr'].median(),
             'lng': loc_data['lng'].mean(),
@@ -42,24 +42,24 @@ def create_location_network(df, location_var=None):
         # Extract values from the nested dictionary/series
         loc_features = [
             location_features[loc]['price_per_sqft'].mean(),
-            location_features[loc]['sqft'].mean()#,
-            # location_features[loc]['sqft_std'].mean(),
-            # location_features[loc]['beds'].mean(),
-            # location_features[loc]['lat'],
-            # location_features[loc]['lng']
+            location_features[loc]['sqft'].mean(),
+            location_features[loc]['sqft_std'].mean(),
+            location_features[loc]['beds'].mean(),
+            location_features[loc]['lat'],
+            location_features[loc]['lng']
         ]
         features_array.append(loc_features)
     
     # Convert to numpy array and standardize
     features_array = np.array(features_array)
     features_standardized = zscore(features_array, axis=0, nan_policy='omit')
+    
     # Create DataFrame with location codes and standardized features
     features_df = pd.DataFrame(
         features_standardized, 
         index=locations,  # This keeps location codes as index
         columns=['price_per_sqft' ,'sqft' 
-                 #,'sqft_std', 'beds', 'lat', 'lng'
-                 #,season_diff'
+                 ,'sqft_std', 'beds', 'lat', 'lng'
         ]
     )
     # Create edges using standardized features
@@ -112,7 +112,7 @@ def detect_communities(G, method = 'gn', res=1):
 
     elif method == 'l':
         best_communities = nx.community.louvain_communities(G, resolution=res)
-        print(best_communities)
+        print(f"Number of communities: {len(best_communities)}")
     # Create a dictionary mapping nodes to their community
     community_dict = {}
     for i, community in enumerate(best_communities):
@@ -145,13 +145,12 @@ def analyze_communities(df, communities, location_var):
     # Initialize community statistics
     community_stats = pd.DataFrame()
     
-    for community_id, locations in communities.items():
+    for i, locations in zip(communities.index, communities['locations']):
         # Get data for all locations in community
         community_data = df[df[location_var].isin(locations)]
-        
         # Calculate community statistics
         stats = {
-            'community_id': community_id,
+            'community_id': i,
             'num_locations': len(locations),
             'num_transactions': len(community_data),
             'avg_sale_price': community_data['sale_price'].mean(),
@@ -177,10 +176,10 @@ def analyze_communities(df, communities, location_var):
             pd.DataFrame([stats])
         ])
     
-    return community_stats.reset_index(drop=True)
+    return community_stats.set_index('community_id',drop=False)
 
 # Example execution:
-def run_community_analysis(df, location_var, method, resolution=None):
+def run_community_analysis(df, location_var, method, resolution=1):
     """
     Complete execution example
     """
@@ -189,13 +188,13 @@ def run_community_analysis(df, location_var, method, resolution=None):
     print(f"Network created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
     
     print("\nDetecting communities...")
-    communities, community_groups = detect_communities(G, method, resolution)
-    print(f"Found {len(community_groups)} communities")
+    communities, summary = detect_communities(G, method, resolution)
+    print(f"Found {len(communities)} communities")
     
     print("\nAnalyzing communities...")
-    community_stats = analyze_communities(df, community_groups, location_var)
+    community_stats = analyze_communities(df, communities, location_var)
     
-    return location_features, G, features_df, array, communities, community_stats, community_groups
+    return location_features, G, features_df, array, communities, summary, community_stats
 
 # # Example usage with sample data:
 # sample_data = pd.DataFrame({

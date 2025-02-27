@@ -17,7 +17,7 @@ def h3_map(df, color, group_by=None):
     print(df[color].dtype)
     if group_by is not None:
         # aggregate color value by group, and replace original value
-        agg_dict = df.groupby(by=group_by)[color].mean().to_dict()
+        agg_dict = df.groupby(by=group_by)[color].median().to_dict()
         df[color] = df[group_by].map(agg_dict)
 
     if df[color].dtype == 'object': # for categorical/discrete variables

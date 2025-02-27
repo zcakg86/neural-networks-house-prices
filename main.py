@@ -39,12 +39,11 @@ locations, communities, community_summary = run_community_analysis(df, location_
 df['community'] = df['h3_08'].map(communities)
 
 #%%
-locations_l, communities_l, summary_l = run_community_analysis(df, location_var = 'h3_08', method = 'l')
+locations_l, communities_l, summary_l = run_community_analysis(df, location_var = 'h3_08', method = 'l', resolution = 1.5)
 df['community_l'] = df['h3_08'].map(communities)
 
 #%%
-c_df = communities_df(communities)
-#%%
+stats = analyze_communities(df, summary_l, location_var = 'h3_08')
 #%%
 h3_map(df, color ='community')
 #%%
