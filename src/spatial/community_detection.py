@@ -21,7 +21,7 @@ def create_location_network(df, location_var=None):
         metrics = {
             'price_per_sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['price_per_sqft'].median(),
             'sqft': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sqft'].median(),
-            'sqft_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sqft'].std(),
+            'sqft_std': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sqft'].std(ddof=0),
             'beds': loc_data.groupby(pd.Grouper(key='sale_date', freq='QE'))['sale_nbr'].median(),
             'lng': loc_data['lng'].mean(),
             'lat': loc_data['lat'].mean()
@@ -154,7 +154,7 @@ def analyze_communities(df, communities, location_var):
             'num_locations': len(locations),
             'num_transactions': len(community_data),
             'avg_sale_price': community_data['sale_price'].mean(),
-            'sale_price_std': community_data['sale_price'].std(),
+            'sale_price_std': community_data['sale_price'].std(ddof=0),
             'price_per_sqft': community_data['price_per_sqft'].mean(),
             'locations': ', '.join(locations)
         }
@@ -167,7 +167,7 @@ def analyze_communities(df, communities, location_var):
             
             stats.update({
                 'sale_price_trend': monthly_sale_prices.pct_change().mean(),
-                'sale_price_volatility': monthly_sale_prices.pct_change().std()
+                'sale_price_volatility': monthly_sale_prices.pct_change().std(ddof=0)
             })
         
         # Add to community statistics

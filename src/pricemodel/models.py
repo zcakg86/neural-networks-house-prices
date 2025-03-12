@@ -16,6 +16,15 @@ class initialmodel(nn.Module):
             dropout=0.2
         )
 
+        # Community embedding
+        self.lstm = nn.LSTM(
+            input_size=sequence_dim,
+            hidden_size=hidden_dim,
+            num_layers=2,
+            batch_first=True,
+            dropout=0.2
+        )
+
         # Spatial processing
         self.spatial_net = nn.Sequential(
             nn.Linear(spatial_dim, hidden_dim),
