@@ -10,8 +10,11 @@ Analysis and model performance to be presented with Panel.
 
 # Methods
 * H3 Index for spatial representation
-* Louvain graph based community detection
-* Temporal embedding layer
+* Girvan-Newman community detection to allocate each H3 index to a community.
+* Community embedding layer
+* Temporal embedding layer based on YYYYMM and DD.
+* Property Attribute data
+
 
 # Data
 Residential Sales data:\
