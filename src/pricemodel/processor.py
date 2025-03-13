@@ -1,3 +1,4 @@
+#%%
 import pandas as pd
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
@@ -5,23 +6,25 @@ from sklearn.preprocessing import StandardScaler
 from src.pricemodel.models import *
 from pytorch_forecasting.data.timeseries import TimeSeriesDataSet
 
-
-# Class for working with data.
-class data_processor:
-    # Declare some objects within class on initialisation of object
-    def __init__(self, sequence_length=5):
-        self.sequence_length = sequence_length
-        self.scalers = {
-            'sequences': StandardScaler(),
-            'spatial': StandardScaler(),
-            'property': StandardScaler(),
-            'prices':StandardScaler()}
+# Function to prepare data
+class dataset:
+    def __init__(self):
+        self.length = None
+        self.community_length = None
+        self.n_years = None
+        self.n_weeks = None
+        self.scaler = StandardScaler()
         self.indices = []
-    # Function to prepare data
-    def prepare_data(self, df):
-        """
-        Expected columns: ['sale_date', 'sale_price', 'lat', 'lng', 'sqft', 'sale_nbr','sqft_lot']
-        """
+        self.community_features = torch.empty(0)
+        self.community_indices = torch.empty(0)
+        self.year_indices = torch.empty(0)
+        self.week_indices = torch.empty(0)
+        self.property_features = torch.empty(0)
+        self.target = torch.empty(0)
+
+
+    def _prepare_data(self, df):
+        """Expected columns: ['sale_date', 'sale_price', 'lat', 'lng', 'sqft', 'sale_nbr','sqft_lot']"""
         # Convert date to datetime
         df['sale_date'] = pd.to_datetime(df['sale_date'])
         # Sort by date
@@ -36,8 +39,49 @@ class data_processor:
         # Create derived features
         df['price_per_sqft'] = df['sale_price'] / df['sqft']
         df['month'] = df['sale_date'].dt.month
-        df['year'] = df['sale_date'].dt.year
+        df['year'] = df['sale_date'].dt.isocalendar().year
+        df['week'] = df['sale_date'].dt.isocalendar().week
         df['log_price']= np.log(df['sale_price'])
+
+        self.length = len(df)
+        self.community_length = len(np.unique(df['community']))
+        self.year_length = len(np.unique(df['year']))
+        self.week_length = len(np.unique(df['week']))
+
+        return(df)
+    
+    def _get_community_features(self, df):
+        community_df = df.groupby(['community', 'year']).agg({
+            'sale_price': ['mean', 'median', 'std'],
+            'sqft' : ['mean'],
+            'beds' : 'median'
+            }).to_dict('index')
+        # Flatten the dictionary values
+        for key, value in community_df.items():
+            community_df[key] = [v for sublist in value.values() for v in (sublist if isinstance(sublist, list) else [sublist])]
+        community_array = np.array([community_df[(c, y)] for c, y in zip(df['community'], df['year'])])
+        self.community_features = torch.tensor(self.scaler.fit_transform(community_array), dtype=torch.float32)
+
+    def _processor(self, df):
+        self.community_indices = torch.tensor(df['community'].values)
+        self.year_indices = torch.tensor(df['year'].values)
+        self.week_indices = torch.tensor(df['week'].values)
+        self.property_features = torch.tensor(self.scaler.fit_transform(df[['sqft','price_per_sqft']].values), dtype=torch.float32)
+        self.target = torch.tensor(self.scaler.fit_transform(df['log_price'].values.reshape(-1, 1)), dtype=torch.float32)
+
+
+
+# Class for working with data.
+class data_processor:
+    # Declare some objects within class on initialisation of object
+    def __init__(self, sequence_length=5):
+        self.sequence_length = sequence_length
+        self.scalers = {
+            'sequences': StandardScaler(),
+            'spatial': StandardScaler(),
+            'property': StandardScaler(),
+            'prices':StandardScaler()}
+        self.indices = []
         
         # Create sequences and features
         sequences, spatial_features, property_features, targets, self.indices, sequence_lengths = self._create_sequences(df)
@@ -197,3 +241,4 @@ class maketensor(Dataset):
                 self.property_features[idx],
                 self.targets[idx],
                 self.sequence_lengths[idx])
+# %%

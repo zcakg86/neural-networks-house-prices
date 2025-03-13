@@ -4,7 +4,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from pytorch_forecasting.models.nn.rnn import LSTM
 
 class initialmodel(nn.Module):
-    def __init__(self, sequence_dim, spatial_dim, property_dim, hidden_dim=64):
+    def __init__(self, sequence_dim, spatial_dim, property_dim, embedding_dim, hidden_dim=64):
         super(initialmodel, self).__init__()
         # Define Layers within model
         # Sequence processing: Similar sales
@@ -15,7 +15,9 @@ class initialmodel(nn.Module):
             batch_first=True,
             dropout=0.2
         )
-
+        self.year_embedding = nn.Embedding(3, embedding_dim)
+        self.week_embedding = nn.Embedding(31, embedding_dim)
+        self.community_embedding = nn.Embedding(n_communities, embedding_dim)
         # Community embedding
         self.lstm = nn.LSTM(
             input_size=sequence_dim,
