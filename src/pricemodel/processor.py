@@ -16,6 +16,7 @@ class dataset:
         self.scaler = StandardScaler()
         self.indices = []
         self.community_features = torch.empty(0)
+        self.community_feature_dim = None
         self.community_indices = torch.empty(0)
         self.year_indices = torch.empty(0)
         self.week_indices = torch.empty(0)
@@ -61,8 +62,10 @@ class dataset:
             community_df[key] = [v for sublist in value.values() for v in (sublist if isinstance(sublist, list) else [sublist])]
         community_array = np.array([community_df[(c, y)] for c, y in zip(df['community'], df['year'])])
         self.community_features = torch.tensor(self.scaler.fit_transform(community_array), dtype=torch.float32)
+        self.community_feature_dim = self.community_features.shape[1]
 
     def _processor(self, df):
+        # Create tensor with each observation being conntiguous
         self.community_indices = torch.tensor(df['community'].values)
         self.year_indices = torch.tensor(df['year'].values)
         self.week_indices = torch.tensor(df['week'].values)
