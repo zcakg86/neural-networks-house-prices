@@ -1,18 +1,13 @@
 from src.pricemodel.models import *
 class price_predictor:
-    def __init__(self, sequence_dim, spatial_dim, property_dim, hidden_dim=64):
+    def __init__(self, dataset, embedding_dim, hidden_dim, property_dim):
         self.device = torch.device('mps' if torch.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = initialmodel(
-            sequence_dim,
-            spatial_dim,
-            property_dim,
-            hidden_dim
-        ).to(self.device)
+        self.model = embeddingmodel(dataset, embedding_dim, hidden_dim, property_dim).to(self.device)
         # Specify loss measure
         self.criterion = nn.MSELoss()
         # And Adam optimiser
         self.optimizer = torch.optim.Adam(self.model.parameters(),lr=1e-4)
-
+        
     def eval(self):
         self.model.eval()
 
@@ -31,7 +26,7 @@ class price_predictor:
                 targets = targets.to(self.device)
                 sequence_lengths = sequence_lengths.to(self.device)
                 self.optimizer.zero_grad()
-                predictions, _ = self.model(sequences, spatial, property_feat, sequence_lengths)
+                predictions, _ = self.model()
 
                 loss = self.criterion(predictions.squeeze(), targets.squeeze())
                 loss.backward()

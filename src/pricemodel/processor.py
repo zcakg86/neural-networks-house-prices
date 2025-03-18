@@ -1,9 +1,9 @@
 #%%
 import pandas as pd
 import numpy as np
+import torch
 from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import StandardScaler
-from src.pricemodel.models import *
 from pytorch_forecasting.data.timeseries import TimeSeriesDataSet
 
 # Function to prepare data
@@ -11,8 +11,8 @@ class dataset:
     def __init__(self):
         self.length = None
         self.community_length = None
-        self.n_years = None
-        self.n_weeks = None
+        self.year_length = None
+        self.week_length = None
         self.scaler = StandardScaler()
         self.indices = []
         self.community_features = torch.empty(0)
@@ -22,7 +22,7 @@ class dataset:
         self.week_indices = torch.empty(0)
         self.property_features = torch.empty(0)
         self.target = torch.empty(0)
-
+        self.dataframe = pd.DataFrame()
 
     def _prepare_data(self, df):
         """Expected columns: ['sale_date', 'sale_price', 'lat', 'lng', 'sqft', 'sale_nbr','sqft_lot']"""
@@ -49,10 +49,10 @@ class dataset:
         self.year_length = len(np.unique(df['year']))
         self.week_length = len(np.unique(df['week']))
 
-        return(df)
+        self.dataframe = df
     
-    def _get_community_features(self, df):
-        community_df = df.groupby(['community', 'year']).agg({
+    def _get_community_features(self):
+        community_df = self.dataframe.groupby(['community', 'year']).agg({
             'sale_price': ['mean', 'median', 'std'],
             'sqft' : ['mean'],
             'beds' : 'median'
@@ -60,17 +60,17 @@ class dataset:
         # Flatten the dictionary values
         for key, value in community_df.items():
             community_df[key] = [v for sublist in value.values() for v in (sublist if isinstance(sublist, list) else [sublist])]
-        community_array = np.array([community_df[(c, y)] for c, y in zip(df['community'], df['year'])])
+        community_array = np.array([community_df[(c, y)] for c, y in zip(self.dataframe['community'], self.dataframe['year'])])
         self.community_features = torch.tensor(self.scaler.fit_transform(community_array), dtype=torch.float32)
         self.community_feature_dim = self.community_features.shape[1]
 
-    def _processor(self, df):
-        # Create tensor with each observation being conntiguous
-        self.community_indices = torch.tensor(df['community'].values)
-        self.year_indices = torch.tensor(df['year'].values)
-        self.week_indices = torch.tensor(df['week'].values)
-        self.property_features = torch.tensor(self.scaler.fit_transform(df[['sqft','price_per_sqft']].values), dtype=torch.float32)
-        self.target = torch.tensor(self.scaler.fit_transform(df['log_price'].values.reshape(-1, 1)), dtype=torch.float32)
+    def _processor(self):
+        # Create tensor with each observation being contiguous, and scale fields.
+        self.community_indices = torch.tensor(self.dataframe['community'].values)
+        self.year_indices = torch.tensor(self.dataframe['year'].values)
+        self.week_indices = torch.tensor(self.dataframe['week'].values)
+        self.property_features = torch.tensor(self.scaler.fit_transform(self.dataframe[['sqft','price_per_sqft']].values), dtype=torch.float32)
+        self.target = torch.tensor(self.scaler.fit_transform(self.dataframe['log_price'].values.reshape(-1, 1)), dtype=torch.float32)
 
 
 

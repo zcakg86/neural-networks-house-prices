@@ -1,20 +1,28 @@
+#%%
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from pytorch_forecasting.models.nn.rnn import LSTM
 
+class embeddingmodel(nn.Module):
+    def __init__(self,dataset, embedding_dim, hidden_dim, property_dim):
+        # inherit from nn.Module
+        super().__init__() 
+        self.dataset = dataset
+        self.property_dim = property_dim
+        self.embedding_dim = embedding_dim
+        self.hidden_dim = hidden_dim
 
-class PropertyPriceModel(nn.Module):
-    def __init__(self, num_communities, num_years, num_weeks, embedding_dim, hidden_dim, community_feature_dim, property_dim):
-        super().__init__()
-
+        print(self.dataset.community_length)
+        print(self.dataset.year_length)
+        print(self.dataset.week_length)
         # Embedding Layers
-        self.community_embedding = nn.Embedding(num_communities, embedding_dim)
-        self.year_embedding = nn.Embedding(num_years, embedding_dim)
-        self.week_embedding = nn.Embedding(num_weeks, embedding_dim)
+        self.community_embedding = nn.Embedding(int(self.dataset.community_length), embedding_dim)
+        self.year_embedding = nn.Embedding(int(self.dataset.year_length), embedding_dim)
+        self.week_embedding = nn.Embedding(int(self.dataset.week_length), embedding_dim)
 
         # Feature Processing Layers
-        self.community_feature_layer = nn.Linear(community_feature_dim, hidden_dim)
+        self.community_feature_layer = nn.Linear(self.dataset.community_feature_dim, hidden_dim)
         self.property_feature_layer = nn.Linear(property_dim, hidden_dim)
 
         # Combine embedding dimension and processed feature dimensions
@@ -22,7 +30,7 @@ class PropertyPriceModel(nn.Module):
         input_dim = combined_embedding_dim + 2 * hidden_dim # Two hidden_dim from processed features
 
         # Attention Layer
-        self.attention_layer = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=4, batch_first=True) # Example: 4 attention heads
+        self.attention_layer = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=2, batch_first=True) 
 
         # Hidden and Output Layers
         self.hidden_layer1 = nn.Linear(input_dim, hidden_dim)  # Input now includes attention output
@@ -32,16 +40,16 @@ class PropertyPriceModel(nn.Module):
         self.relu = nn.ReLU()
 
 
-    def forward(self, community_indices, year_indices, week_indices, property_features, community_features):
+    def forward(self):
         # Embeddings
-        community_embeddings = self.community_embedding(community_indices)
-        year_embeddings = self.year_embedding(year_indices)
-        week_embeddings = self.week_embedding(week_indices)
+        community_embeddings = self.community_embedding(self.community_indices)
+        year_embeddings = self.year_embedding(self.year_indices)
+        week_embeddings = self.week_embedding(self.week_indices)
         combined_embeddings = torch.cat([community_embeddings, year_embeddings, week_embeddings], dim=-1)
 
         # Feature Processing
-        processed_community_features = self.relu(self.community_feature_layer(community_features))
-        processed_property_features = self.relu(self.property_feature_layer(property_features))
+        processed_community_features = self.relu(self.community_feature_layer(self.community_features))
+        processed_property_features = self.relu(self.property_feature_layer(self.property_features))
 
         # Combine embeddings and features
         combined_features = torch.cat([combined_embeddings, processed_community_features, processed_property_features], dim=-1)
@@ -152,3 +160,5 @@ class initialmodel(nn.Module):
         print(prediction)
 
         return prediction, attention_weights
+
+# %%

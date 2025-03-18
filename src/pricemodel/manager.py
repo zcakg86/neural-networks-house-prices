@@ -21,13 +21,14 @@ class modelmanager:
         """Save model, config, processor, and results"""
         import os
         os.makedirs(path, exist_ok=True)
-
-        config = {
-              'sequence_dim': self.model.model.lstm.input_size,
-              'spatial_dim': next(self.model.model.spatial_net.parameters()).shape[1],
-              'property_dim': next(self.model.model.property_net.parameters()).shape[1],
-              'hidden_dim': self.model.model.lstm.hidden_size,
-        }
+        config = {}
+        for name, module in self.model.model.named_modules():
+            print(f"Module name: {name}")
+            params = {}
+            for param_name, param in module.named_parameters(recurse=False):
+                print(f"\tParameter name: {param_name}, shape: {param.shape}")
+                params[param_name] = [param.shape]
+            config[name] = params
         # Save model state
         torch.save({
             'model_state_dict': self.model.model.state_dict(),
@@ -50,7 +51,7 @@ class modelmanager:
 
         print(f"Model and results saved in {path}")
 
-    def add_predictions_to_data(self, df, sequences, spatial_features, property_features, sequence_lengths):
+    def add_predictions_to_data(self, data):
         """Add model predictions to dataframe"""
         self.model.eval()
         predictions = []

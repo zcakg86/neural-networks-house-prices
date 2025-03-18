@@ -8,11 +8,16 @@ df = df.sample(n=100, random_state = 92)
 #manager, df_with_predictions = train_and_save_model(df,sequence_length=10, epochs = 5)
 #%% dataset will store information about the dataframe, once dataframe prepared
 dataset = dataset()
-df = dataset._prepare_data(df)
+dataset._prepare_data(df)
 #%% find aggregate features
-dataset._get_community_features(df)
+dataset._get_community_features()
 #%% Scale and Create tensors
-dataset._processor(df)
+dataset._processor()
 #%%
-PropertyPriceModel(dataset.community_feature_dim)
+print(dataset.community_length)
+#%%
+model = embeddingmodel()
+#%%
+model = embeddingmodel(dataset, embedding_dim = 8, hidden_dim = 8, property_dim = 6)
+# %%
 # %%
