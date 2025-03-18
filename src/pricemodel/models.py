@@ -5,7 +5,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from pytorch_forecasting.models.nn.rnn import LSTM
 
 class embeddingmodel(nn.Module):
-    def __init__(self,dataset, embedding_dim, hidden_dim, property_dim):
+    def __init__(self, dataset, embedding_dim, hidden_dim, property_dim):
         # inherit from nn.Module
         super().__init__() 
         self.dataset = dataset

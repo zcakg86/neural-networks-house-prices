@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from pytorch_forecasting.data.timeseries import TimeSeriesDataSet
 
@@ -66,13 +66,11 @@ class dataset:
 
     def _processor(self):
         # Create tensor with each observation being contiguous, and scale fields.
-        self.community_indices = torch.tensor(self.dataframe['community'].values)
-        self.year_indices = torch.tensor(self.dataframe['year'].values)
-        self.week_indices = torch.tensor(self.dataframe['week'].values)
-        self.property_features = torch.tensor(self.scaler.fit_transform(self.dataframe[['sqft','price_per_sqft']].values), dtype=torch.float32)
-        self.target = torch.tensor(self.scaler.fit_transform(self.dataframe['log_price'].values.reshape(-1, 1)), dtype=torch.float32)
-
-
+        self.tensors = TensorDataset(torch.tensor(self.dataframe['community'].values, dtype=torch.int8),
+                                     torch.tensor(self.dataframe['year'].values, dtype=torch.int8),
+                                     torch.tensor(self.dataframe['week'].values, dtype=torch.int8),
+                                     torch.tensor(self.scaler.fit_transform(self.dataframe[['sqft','price_per_sqft']].values), dtype=torch.float32),
+                                     torch.tensor(self.scaler.fit_transform(self.dataframe['log_price'].values.reshape(-1, 1)), dtype=torch.float32))
 
 # Class for working with data.
 class data_processor:

@@ -17,6 +17,40 @@ class modelmanager:
             'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S")
         }
 
+    def train_model(dataset, model, epochs = 10):
+        # Process data
+        
+        # Create and train model
+        predictor = price_predictor()
+        # Create data loaders and train
+        train_size = int(0.8 * len(dataset))
+        val_size = len(dataset) - train_size
+        train_dataset, val_dataset = torch.utils.data.random_split(
+            dataset, [train_size, val_size]
+        )
+
+        train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=64)
+
+        train_losses, val_losses = predictor.train(train_loader, val_loader, epochs = epochs)
+
+        # Initialize model manager
+        manager = modelmanager(predictor, processor)
+        manager.results['train_losses'] = train_losses
+        manager.results['val_losses'] = val_losses
+
+        # Save everything
+        manager.save_model()
+        # Add predictions to data
+        df_with_pred = manager.add_predictions_to_data(
+            df, sequences, spatial_features, property_features, sequence_lengths
+        )
+
+        # # Save predictions to CSV
+        df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
+                            index=False)
+        return manager
+
     def save_model(self, path="outputs/models/"):
         """Save model, config, processor, and results"""
         import os
@@ -51,16 +85,13 @@ class modelmanager:
 
         print(f"Model and results saved in {path}")
 
-    def add_predictions_to_data(self, data):
+    def add_predictions_to_data(self, batch_size = 32):
         """Add model predictions to dataframe"""
         self.model.eval()
         predictions = []
         prediction_indices = []
 
-        # Create DataLoader for prediction
-        dataset = maketensor(sequences, spatial_features, property_features,
-                                  np.zeros(len(sequences)), sequence_lengths)  # dummy targets
-        loader = DataLoader(dataset, batch_size=32)
+        loader = DataLoader(self.model.dataset.tensors, batch_size)
         
         current_idx = 0
 
