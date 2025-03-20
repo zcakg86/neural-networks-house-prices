@@ -16,9 +16,8 @@ dataset._processor()
 #%%
 print(dataset.community_length)
 #%%
-model = embeddingmodel(dataset, embedding_dim = 8, hidden_dim = 8, property_dim = 6)
 # %%
-print(model.dataset.community_length)
 # %%
-price_predictor(model.dataset, 8, 8, 8)
+predictor = price_predictor(dataset, embedding_dim = 8, hidden_dim = 8, property_dim = 6)
+
 # %%

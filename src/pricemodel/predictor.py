@@ -19,14 +19,13 @@ class price_predictor:
             # Training
             self.model.train()
             train_loss = 0
-            for sequences, spatial, property_feat, targets, sequence_lengths in train_loader:
-                sequences = sequences.to(self.device)
-                spatial = spatial.to(self.device)
-                property_feat = property_feat.to(self.device)
-                targets = targets.to(self.device)
-                sequence_lengths = sequence_lengths.to(self.device)
+            for batch in train_loader:
+                # Move each tensor in the batch to the device
+                batch = tuple(t.to(self.device) for t in batch)
+                # Unpack the batch
+                community, community_features, year, week, property, targets = batch
                 self.optimizer.zero_grad()
-                predictions, _ = self.model()
+                predictions, _ = self.model(community, community_features, year, week, property, targets)
 
                 loss = self.criterion(predictions.squeeze(), targets.squeeze())
                 loss.backward()
@@ -39,14 +38,13 @@ class price_predictor:
             self.model.eval()
             val_loss = 0
             with torch.no_grad():
-                for sequences, spatial, property_feat, targets, sequence_lengths in val_loader:
-                    sequences = sequences.to(self.device)
-                    spatial = spatial.to(self.device)
-                    property_feat = property_feat.to(self.device)
-                    targets = targets.to(self.device)
-                    sequence_lengths = sequence_lengths.to(self.device)
-                    predictions, _ = self.model(sequences, spatial, property_feat, sequence_lengths)
-                    loss = self.criterion(predictions.squeeze(), targets.squeeze())
+                for batch in val_loader:
+                    # Move each tensor in the batch to the device
+                    batch = tuple(t.to(self.device) for t in batch)
+                    # Unpack the batch
+                    community, community_features, year, week, property, targets = batch
+                    self.optimizer.zero_grad()
+                    predictions, _ = self.model(community, community_features, year, week, property, targets)
                     val_loss += loss.item()
 
             train_losses.append(train_loss / len(train_loader))

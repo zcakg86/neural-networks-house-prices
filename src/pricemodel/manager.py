@@ -6,9 +6,9 @@ import json
 
 
 class modelmanager:
-    def __init__(self, model, processor, model_name="property_model"):
-        self.model = model
-        self.processor = processor
+    def __init__(self, predictor, dataset, model_name="property_model"):
+        self.model = None
+        self.dataset = dataset
         self.model_name = model_name
         self.results = {
             'train_losses': [],
@@ -17,16 +17,16 @@ class modelmanager:
             'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S")
         }
 
-    def train_model(dataset, model, epochs = 10):
+    def train_model(self, epochs = 10):
         # Process data
-        
-        # Create and train model
-        predictor = price_predictor()
+        ## add later
+        # Create and train model. price_predictor contains model spec.
+        predictor = price_predictor(dataset, model)
         # Create data loaders and train
         train_size = int(0.8 * len(dataset))
         val_size = len(dataset) - train_size
         train_dataset, val_dataset = torch.utils.data.random_split(
-            dataset, [train_size, val_size]
+            self.dataset, [train_size, val_size]
         )
 
         train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
@@ -35,7 +35,7 @@ class modelmanager:
         train_losses, val_losses = predictor.train(train_loader, val_loader, epochs = epochs)
 
         # Initialize model manager
-        manager = modelmanager(predictor, processor)
+        manager = modelmanager(predictor, dataset)
         manager.results['train_losses'] = train_losses
         manager.results['val_losses'] = val_losses
 
@@ -43,7 +43,6 @@ class modelmanager:
         manager.save_model()
         # Add predictions to data
         df_with_pred = manager.add_predictions_to_data(
-            df, sequences, spatial_features, property_features, sequence_lengths
         )
 
         # # Save predictions to CSV

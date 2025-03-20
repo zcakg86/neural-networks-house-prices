@@ -8,21 +8,20 @@ class embeddingmodel(nn.Module):
     def __init__(self, dataset, embedding_dim, hidden_dim, property_dim):
         # inherit from nn.Module
         super().__init__() 
-        self.dataset = dataset
         self.property_dim = property_dim
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
 
-        print(self.dataset.community_length)
-        print(self.dataset.year_length)
-        print(self.dataset.week_length)
+        print(dataset.community_length)
+        print(dataset.year_length)
+        print(dataset.week_length)
         # Embedding Layers
-        self.community_embedding = nn.Embedding(int(self.dataset.community_length), embedding_dim)
-        self.year_embedding = nn.Embedding(int(self.dataset.year_length), embedding_dim)
-        self.week_embedding = nn.Embedding(int(self.dataset.week_length), embedding_dim)
+        self.community_embedding = nn.Embedding(int(dataset.community_length), embedding_dim)
+        self.year_embedding = nn.Embedding(int(dataset.year_length), embedding_dim)
+        self.week_embedding = nn.Embedding(int(dataset.week_length), embedding_dim)
 
         # Feature Processing Layers
-        self.community_feature_layer = nn.Linear(self.dataset.community_feature_dim, hidden_dim)
+        self.community_feature_layer = nn.Linear(dataset.community_feature_dim, hidden_dim)
         self.property_feature_layer = nn.Linear(property_dim, hidden_dim)
 
         # Combine embedding dimension and processed feature dimensions
@@ -40,16 +39,16 @@ class embeddingmodel(nn.Module):
         self.relu = nn.ReLU()
 
 
-    def forward(self):
+    def forward(self, community_indices, community_features, year, week, property_features, targets):
         # Embeddings
-        community_embeddings = self.community_embedding(self.community_indices)
-        year_embeddings = self.year_embedding(self.year_indices)
-        week_embeddings = self.week_embedding(self.week_indices)
+        community_embeddings = self.community_embedding(community_indices)
+        year_embeddings = self.year_embedding(year)
+        week_embeddings = self.week_embedding(week)
         combined_embeddings = torch.cat([community_embeddings, year_embeddings, week_embeddings], dim=-1)
 
         # Feature Processing
-        processed_community_features = self.relu(self.community_feature_layer(self.community_features))
-        processed_property_features = self.relu(self.property_feature_layer(self.property_features))
+        processed_community_features = self.relu(self.community_feature_layer(community_features))
+        processed_property_features = self.relu(self.property_feature_layer(property_features))
 
         # Combine embeddings and features
         combined_features = torch.cat([combined_embeddings, processed_community_features, processed_property_features], dim=-1)

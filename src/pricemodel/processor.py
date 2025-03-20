@@ -67,6 +67,7 @@ class dataset:
     def _processor(self):
         # Create tensor with each observation being contiguous, and scale fields.
         self.tensors = TensorDataset(torch.tensor(self.dataframe['community'].values, dtype=torch.int8),
+                                     self.community_features,
                                      torch.tensor(self.dataframe['year'].values, dtype=torch.int8),
                                      torch.tensor(self.dataframe['week'].values, dtype=torch.int8),
                                      torch.tensor(self.scaler.fit_transform(self.dataframe[['sqft','price_per_sqft']].values), dtype=torch.float32),
