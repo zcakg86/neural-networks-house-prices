@@ -44,7 +44,7 @@ class dataset:
         df['week'] = df['sale_date'].dt.isocalendar().week
         df['log_price']= np.log(df['sale_price'])
 
-        self.length = len(df)
+        self.length = df.shape[0]
         self.community_length = len(np.unique(df['community']))
         self.year_length = len(np.unique(df['year']))
         self.week_length = len(np.unique(df['week']))
@@ -66,10 +66,10 @@ class dataset:
 
     def _processor(self):
         # Create tensor with each observation being contiguous, and scale fields.
-        self.tensors = TensorDataset(torch.tensor(self.dataframe['community'].values, dtype=torch.int8),
+        self.tensors = TensorDataset(torch.tensor(self.dataframe['community'].values, dtype=torch.int16),
                                      self.community_features,
-                                     torch.tensor(self.dataframe['year'].values, dtype=torch.int8),
-                                     torch.tensor(self.dataframe['week'].values, dtype=torch.int8),
+                                     torch.tensor(self.dataframe['year'].values, dtype=torch.int16),
+                                     torch.tensor(self.dataframe['week'].values, dtype=torch.int16),
                                      torch.tensor(self.scaler.fit_transform(self.dataframe[['sqft','price_per_sqft']].values), dtype=torch.float32),
                                      torch.tensor(self.scaler.fit_transform(self.dataframe['log_price'].values.reshape(-1, 1)), dtype=torch.float32))
 

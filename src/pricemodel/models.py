@@ -11,10 +11,6 @@ class embeddingmodel(nn.Module):
         self.property_dim = property_dim
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
-
-        print(dataset.community_length)
-        print(dataset.year_length)
-        print(dataset.week_length)
         # Embedding Layers
         self.community_embedding = nn.Embedding(int(dataset.community_length), embedding_dim)
         self.year_embedding = nn.Embedding(int(dataset.year_length), embedding_dim)

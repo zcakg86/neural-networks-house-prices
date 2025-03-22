@@ -1,4 +1,5 @@
-from src.pricemodel.models import *
+#%%
+# from src.pricemodel.models import *
 class price_predictor:
     def __init__(self, dataset, embedding_dim, hidden_dim, property_dim):
         self.device = torch.device('mps' if torch.mps.is_available() else 'cuda' if torch.cuda.is_available() else 'cpu')
@@ -57,3 +58,5 @@ class price_predictor:
         return train_losses, val_losses
 
 
+
+# %%

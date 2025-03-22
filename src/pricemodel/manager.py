@@ -1,12 +1,13 @@
-from src.pricemodel.processor import *
-from src.pricemodel.predictor import *
+#%%
+#from src.pricemodel.processor import *
+#from src.pricemodel.predictor import *
 from datetime import datetime
 import pickle
 import json
 
 
 class modelmanager:
-    def __init__(self, predictor, dataset, model_name="property_model"):
+    def __init__(self, dataset, model_name="property_model"):
         self.model = None
         self.dataset = dataset
         self.model_name = model_name
@@ -15,16 +16,19 @@ class modelmanager:
             'val_losses': [],
             'metrics': {},
             'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S")
-        }
+        },
+        self.embedding_dim = None, 
+        self.hidden_dim = None, 
+        self.property_dim = None
 
-    def train_model(self, epochs = 10):
+    def train_model(self, embedding_dim, hidden_dim, property_dim, epochs = 10):
         # Process data
         ## add later
         # Create and train model. price_predictor contains model spec.
-        predictor = price_predictor(dataset, model)
+        predictor = price_predictor(dataset, embedding_dim, hidden_dim, property_dim)
         # Create data loaders and train
-        train_size = int(0.8 * len(dataset))
-        val_size = len(dataset) - train_size
+        train_size = int(0.8 * dataset.length)
+        val_size = dataset.length - train_size
         train_dataset, val_dataset = torch.utils.data.random_split(
             self.dataset, [train_size, val_size]
         )
@@ -39,15 +43,19 @@ class modelmanager:
         manager.results['train_losses'] = train_losses
         manager.results['val_losses'] = val_losses
 
+        manager.embedding_dim = embedding_dim, 
+        manager.hidden_dim = hidden_dim, 
+        manager.property_dim = property_dim
+
         # Save everything
         manager.save_model()
         # Add predictions to data
-        df_with_pred = manager.add_predictions_to_data(
-        )
+        #df_with_pred = manager.add_predictions_to_data(
+        #)
 
         # # Save predictions to CSV
-        df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
-                            index=False)
+        #df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
+        #                    index=False)
         return manager
 
     def save_model(self, path="outputs/models/"):
@@ -249,3 +257,5 @@ def load_saved_model_with_config(path_prefix):
     predictor.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     return predictor, processor
+
+# %%
