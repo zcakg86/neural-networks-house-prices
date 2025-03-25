@@ -6,3 +6,7 @@ Convert BallTree to h3 Kring?
 Make attention weights retreivable
 Review all network layer types
 all .cpu to self.device()
+
+
+
+Move scaler post data split

@@ -5,19 +5,27 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from pytorch_forecasting.models.nn.rnn import LSTM
 
 class embeddingmodel(nn.Module):
-    def __init__(self, dataset, embedding_dim, hidden_dim, property_dim):
+    def __init__(self, embedding_dim, hidden_dim, property_dim, 
+                 community_length,community_feature_dim, week_length, year_length):
         # inherit from nn.Module
-        super().__init__() 
+        super().__init__()
+        # Layer dims
         self.property_dim = property_dim
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
+        # Embedding dims
+        self.community_length= community_length
+        self.community_feature_dim = community_feature_dim
+        self.week_length = week_length
+        self.year_length = year_length
+
         # Embedding Layers
-        self.community_embedding = nn.Embedding(int(dataset.community_length), embedding_dim)
-        self.year_embedding = nn.Embedding(int(dataset.year_length), embedding_dim)
-        self.week_embedding = nn.Embedding(int(dataset.week_length), embedding_dim)
+        self.community_embedding = nn.Embedding(int(self.community_length), embedding_dim)
+        self.year_embedding = nn.Embedding(int(self.year_length), embedding_dim)
+        self.week_embedding = nn.Embedding(int(self.week_length), embedding_dim)
 
         # Feature Processing Layers
-        self.community_feature_layer = nn.Linear(dataset.community_feature_dim, hidden_dim)
+        self.community_feature_layer = nn.Linear(self.community_feature_dim, hidden_dim)
         self.property_feature_layer = nn.Linear(property_dim, hidden_dim)
 
         # Combine embedding dimension and processed feature dimensions

@@ -22,17 +22,26 @@ class modelmanager:
         self.embedding_dim = None, 
         self.hidden_dim = None, 
         self.property_dim = None
+        self.community_length = self.dataset.community_length
+        self.community_feature_dim = self.dataset.community_feature_dim
+        self.week_length = self.dataset.week_length
+        self.year_length= self.dataset.year_length
 
     def train_model(self, embedding_dim, hidden_dim, property_dim, epochs = 10):
         # Process data
         ## add later
         # Create and train model. price_predictor contains model spec.
-        predictor = price_predictor(dataset, embedding_dim, hidden_dim, property_dim)
-        # Create data loaders and train
-        train_size = int(0.8 * dataset.length)
-        val_size = dataset.length - train_size
+        predictor = price_predictor(embedding_dim, hidden_dim, property_dim,
+                                    self.community_length, 
+                                    self.community_feature_dim,
+                                    self.week_length, self.year_length)
+        # Split data, and create DataLoader for batces.
+        # Sizes from model attributes.
+        train_size = int(0.8 * self.dataset.length)
+        val_size = self.dataset.length - train_size
+
         train_dataset, val_dataset = torch.utils.data.random_split(
-            self.dataset, [train_size, val_size]
+            self.dataset.tensors, [train_size, val_size]
         )
 
         train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)

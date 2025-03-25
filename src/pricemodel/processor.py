@@ -2,6 +2,7 @@
 import pandas as pd
 import numpy as np
 import torch
+import joblib
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 from sklearn.preprocessing import StandardScaler
 from pytorch_forecasting.data.timeseries import TimeSeriesDataSet
@@ -13,9 +14,9 @@ class dataset:
         self.community_length = None
         self.year_length = None
         self.week_length = None
-        self.scaler = StandardScaler()
+        self.scalers = {}
         self.indices = []
-        self.community_features = torch.empty(0)
+        self.community_array = np.empty(0)
         self.community_feature_dim = None
         self.community_indices = torch.empty(0)
         self.year_indices = torch.empty(0)
@@ -44,15 +45,20 @@ class dataset:
         df['week'] = df['sale_date'].dt.isocalendar().week
         df['log_price']= np.log(df['sale_price'])
 
+        community_ids = sorted(df['community'].unique()) # Sort for consistent order across runs
+        self.community_vocab = {community_id: index for index, community_id in enumerate(community_ids)}
+        self.community_length = len(self.community_vocab)
+        # Convert community IDs to indices using the vocabulary
+        df['community_idx'] = df['community'].map(self.community_vocab) # New column with indices
+
         self.length = df.shape[0]
-        self.community_length = len(np.unique(df['community']))
         self.year_length = len(np.unique(df['year']))
         self.week_length = len(np.unique(df['week']))
 
         self.dataframe = df
     
     def _get_community_features(self):
-        community_df = self.dataframe.groupby(['community', 'year']).agg({
+        community_df = self.dataframe.groupby(['community_idx', 'year']).agg({
             'sale_price': ['mean', 'median', 'std'],
             'sqft' : ['mean'],
             'beds' : 'median'
@@ -60,18 +66,39 @@ class dataset:
         # Flatten the dictionary values
         for key, value in community_df.items():
             community_df[key] = [v for sublist in value.values() for v in (sublist if isinstance(sublist, list) else [sublist])]
-        community_array = np.array([community_df[(c, y)] for c, y in zip(self.dataframe['community'], self.dataframe['year'])])
-        self.community_features = torch.tensor(self.scaler.fit_transform(community_array), dtype=torch.float32)
-        self.community_feature_dim = self.community_features.shape[1]
+        self.community_array = np.array([community_df[(c, y)] for c, y in zip(self.dataframe['community_idx'], self.dataframe['year'])])
+        self.community_feature_dim = self.community_array.shape[1]
 
-    def _processor(self):
+    def _processor(self, mode = 'train'):
+
+        for feature in ['sqft','sqft_lot','log_price']: # List the features to scale
+            if mode == "train":
+                self.scalers[feature] = StandardScaler() # Create a new scaler for each feature
+                self.dataframe[f"{feature}_scaled"] = self.scalers[feature].fit_transform(self.dataframe[[feature]]) # Fit and transform
+                # Save the scaler
+                joblib.dump(self.scalers[feature], f"{feature}_scaler.pkl")
+            else:  # mode == "val" or "test"
+                # Load the pre-fitted scaler
+                scaler = joblib.load(f"{feature}_scaler.pkl")
+                self.dataframe[feature] = scaler.transform(self.dataframe[[feature]])
+        # Community df
+        if mode == 'train':
+            self.scalers['community'] = StandardScaler()
+            self.community_array = self.scalers[feature].fit_transform(self.community_array)
+            joblib.dump(self.scalers['communties'], "communities_scaler.pkl")
+
+        else: 
+            scaler = joblib.load("communities_scaler.pkl")
+            self.community_array = scaler.transform(self.community_array)
+
+        self.community_feature_dim = self.community_array.shape[1]
         # Create tensor with each observation being contiguous, and scale fields.
-        self.tensors = TensorDataset(torch.tensor(self.dataframe['community'].values, dtype=torch.int16),
-                                     self.community_features,
-                                     torch.tensor(self.dataframe['year'].values, dtype=torch.int16),
-                                     torch.tensor(self.dataframe['week'].values, dtype=torch.int16),
-                                     torch.tensor(self.scaler.fit_transform(self.dataframe[['sqft','price_per_sqft']].values), dtype=torch.float32),
-                                     torch.tensor(self.scaler.fit_transform(self.dataframe['log_price'].values.reshape(-1, 1)), dtype=torch.float32))
+        self.tensors = TensorDataset(torch.tensor(self.dataframe['community_idx'].values, dtype=torch.int),
+                                     torch.tensor(self.community_array,dtype = torch.float32),
+                                     torch.tensor(self.dataframe['year'].values, dtype=torch.int),
+                                     torch.tensor(self.dataframe['week'].values, dtype=torch.int),
+                                     torch.tensor(self.dataframe['sqft_scaled','sqft_lot_scaled'].values, dtype=torch.float32),
+                                     torch.tensor(self.dataframe['log_price_scaled'].values.reshape(-1, 1)), dtype=torch.float32))
 
 # Class for working with data.
 class data_processor:
