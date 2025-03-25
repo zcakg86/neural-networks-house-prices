@@ -38,15 +38,15 @@ class modelmanager:
         )
         self.num_embedding_comm = train_dataset[:][0].unique().numel()
         # Create year vocabulary for the TRAINING dataset ONLY
-        train_years = torch.sort(train_dataset[:][2].unique())
-        train_weeks = torch.sort(train_dataset[:][3].unique())
-        self.train_year_vocab = {i:torch.prod(x).item() for i, x in enumerate(dataset.tensors[:][3].unique())}
-        self.train_weeks_vocab = {i:torch.prod(x).item() for i, x in enumerate(dataset.tensors[:][3].unique())}
-        self.train_year_length = len(train_years)
+        train_years = sorted(dataset.tensors[:][2].unique().tolist())
+        train_weeks = sorted(dataset.tensors[:][3].unique().tolist())
+        self.train_year_vocab = {year: idx for idx, year in enumerate(train_years)}
+        self.train_weeks_vocab = {year: idx for idx, year in enumerate(train_weeks)}
+        self.train_years_length = len(train_years)
+        self.train_weeks_length = len(train_weeks)
 
-        # Convert years to indices in the TRAINING DataFrame using the TRAINING vocabulary
-        train_df['year_idx'] = train_df['year'].map(self.train_year_vocab)
-        val_df['year_idx'] = val_df['year'].map(self.train_year_vocab) # Use train vocab for val/test as well
+        dataset.tensors[:][2] = torch.tensor([self.train_year_vocab[year.item()] for year in dataset.tensors[:][2]], dtype=torch.int)
+        dataset.tensors[:][3] = torch.tensor([self.train_year_vocab[week.item()] for week in dataset.tensors[:][3]], dtype=torch.int)
 
 
         train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)

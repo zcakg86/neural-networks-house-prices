@@ -46,11 +46,16 @@ class dataset:
         df['log_price']= np.log(df['sale_price'])
 
         self.week_vocab = {value: index for index, value in enumerate(range(1,54))}
-        self.year_vocab = {value: index for index, value in enumerate(range(1999,2025))}
+        self.year_vocab = {value: index for index, value in enumerate(range(2020,2026))}
         self.week_vocab = {community_id: index for index, community_id in enumerate(range(1,54))}
-
-        community_ids = sorted(df['community'].unique()) # Sort for consistent order across runs
-        self.community_vocab = {community_id: index for index, community_id in enumerate(community_ids)}
+        def create_vocab(column,min=None,max=None):
+            #if min && max:
+            ids = sorted(df['community'].unique())
+            vocab = {id: index for index, id in enumerate(ids)}
+            return vocab
+        self.community_vocab = create_vocab('community')
+        #community_ids = sorted(df['community'].unique()) # Sort for consistent order across runs
+        #self.community_vocab = {community_id: index for index, community_id in enumerate(community_ids)}
         self.community_length = len(self.community_vocab)
         # Convert community IDs to indices using the vocabulary
         df['community_index'] = df['community'].map(self.community_vocab) # New column with indices
@@ -102,7 +107,7 @@ class dataset:
             self.community_array = scaler.transform(self.community_array)
 
         # Create tensor with each observation being contiguous, and scale fields.
-        self.tensors = TensorDataset(torch.tensor(self.dataframe['community_idx'].values, dtype=torch.int),
+        self.tensors = TensorDataset(torch.tensor(self.dataframe['community_index'].values, dtype=torch.int),
                                      torch.tensor(self.community_array,dtype = torch.float32),
                                      torch.tensor(self.dataframe['year'].values, dtype=torch.int),
                                      torch.tensor(self.dataframe['week'].values, dtype=torch.int),
