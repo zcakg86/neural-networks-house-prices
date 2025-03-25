@@ -28,13 +28,6 @@ class modelmanager:
         self.year_length= self.dataset.year_length
 
     def train_model(self, embedding_dim, hidden_dim, property_dim, epochs = 10):
-        # Process data
-        ## add later
-        # Create and train model. price_predictor contains model spec.
-        predictor = price_predictor(embedding_dim, hidden_dim, property_dim,
-                                    self.community_length, 
-                                    self.community_feature_dim,
-                                    self.week_length, self.year_length)
         # Split data, and create DataLoader for batces.
         # Sizes from model attributes.
         train_size = int(0.8 * self.dataset.length)
@@ -43,11 +36,30 @@ class modelmanager:
         train_dataset, val_dataset = torch.utils.data.random_split(
             self.dataset.tensors, [train_size, val_size]
         )
+        self.num_embedding_comm = train_dataset[:][0].unique().numel()
+        # Create year vocabulary for the TRAINING dataset ONLY
+        train_years = torch.sort(train_dataset[:][2].unique())
+        train_weeks = torch.sort(train_dataset[:][3].unique())
+        self.train_year_vocab = {i:torch.prod(x).item() for i, x in enumerate(dataset.tensors[:][3].unique())}
+        self.train_weeks_vocab = {i:torch.prod(x).item() for i, x in enumerate(dataset.tensors[:][3].unique())}
+        self.train_year_length = len(train_years)
+
+        # Convert years to indices in the TRAINING DataFrame using the TRAINING vocabulary
+        train_df['year_idx'] = train_df['year'].map(self.train_year_vocab)
+        val_df['year_idx'] = val_df['year'].map(self.train_year_vocab) # Use train vocab for val/test as well
+
 
         train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=64)
 
+        # Create and train model. price_predictor contains model spec.
+        predictor = price_predictor(embedding_dim, hidden_dim, property_dim,
+                                    self.num_embedding_comm, 
+                                    self.community_feature_dim,
+                                    self.week_length, self.year_length)
+        
         train_losses, val_losses = predictor.train(train_loader, val_loader, epochs = epochs)
+
 
         # Initialize model manager
         manager = modelmanager(predictor, dataset)
