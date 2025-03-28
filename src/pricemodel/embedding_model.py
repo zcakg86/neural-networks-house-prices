@@ -120,8 +120,9 @@ class dataset:
 
 class embeddingmodel(nn.Module):
     def __init__(self, embedding_dim, hidden_dim, property_dim, 
-                 community_embedding_length,community_feature_dim,
+                 community_embedding_length, community_feature_dim,
                  year_length, week_length):
+
         # inherit from nn.Module
         super().__init__()
         # Layer dims
@@ -133,30 +134,24 @@ class embeddingmodel(nn.Module):
         self.community_feature_dim = community_feature_dim
         self.week_length = week_length
         self.year_length = year_length
-
         # Embedding Layers
-        self.community_embedding = nn.Embedding(int(self.community_embedding_length), embedding_dim)
-        self.year_embedding = nn.Embedding(int(self.year_length), embedding_dim)
-        self.week_embedding = nn.Embedding(int(self.week_length), embedding_dim)
+        self.community_embedding = nn.Embedding(int(community_embedding_length), embedding_dim)
+        self.year_embedding = nn.Embedding(int(year_length), embedding_dim)
+        self.week_embedding = nn.Embedding(int(week_length), embedding_dim)
 
         # Feature Processing Layers
-        self.community_feature_layer = nn.Linear(self.community_feature_dim, hidden_dim)
+        self.community_feature_layer = nn.Linear(community_feature_dim, hidden_dim)
         self.property_feature_layer = nn.Linear(property_dim, hidden_dim)
 
-        # Combine embedding dimension and processed feature dimensions
-        combined_embedding_dim = 3 * embedding_dim
-        input_dim = combined_embedding_dim + 2 * hidden_dim # Two hidden_dim from processed features
+        # Calculate combined embedding dimension dynamically
+        self.combined_embedding_dim = 3 * embedding_dim
 
-        # Attention Layer
-        self.attention_layer = nn.MultiheadAttention(embed_dim=self.week_length, num_heads=1, batch_first=True) 
-
-        # Hidden and Output Layers
-        self.hidden_layer1 = nn.Linear(input_dim, hidden_dim)  # Input now includes attention output
-        self.hidden_layer2 = nn.Linear(hidden_dim, hidden_dim)  # Optional additional hidden layer
+        # Hidden and Output Layers (input_dim calculated dynamically in forward)
+        self.hidden_layer1 = nn.Linear(2 * hidden_dim + self.combined_embedding_dim, hidden_dim)
+        self.hidden_layer2 = nn.Linear(hidden_dim, hidden_dim)
         self.output_layer = nn.Linear(hidden_dim, 1)
 
         self.relu = nn.ReLU()
-
 
     def forward(self, community_indices, community_features, year, week, property_features, targets):
         # Embeddings
@@ -169,25 +164,25 @@ class embeddingmodel(nn.Module):
         processed_community_features = self.relu(self.community_feature_layer(community_features))
         processed_property_features = self.relu(self.property_feature_layer(property_features))
 
-        # Combine embeddings and features
+        # Combine embeddings and features (calculate input_dim dynamically)
         combined_features = torch.cat([combined_embeddings, processed_community_features, processed_property_features], dim=-1)
-
-        # Reshape for attention layer (requires 3D tensor: batch_size x seq_len x features)
-        # In this case, seq_len = 1 because we're treating each property as a single sequence
+        
+        embed_dim_attention = combined_features.shape[-1] 
+        # Reshape for attention
         combined_features = combined_features.unsqueeze(1)
 
         # Attention Layer
-        attention_output, _ = self.attention_layer(combined_features, combined_features, combined_features) # Self-attention
-        attention_output = attention_output.squeeze(1) # Remove sequence dimension
+        attention_layer = nn.MultiheadAttention(embed_dim=embed_dim_attention, num_heads=2, batch_first=True) # Create the layer HERE
+        attention_output, _ = attention_layer(combined_features, combined_features, combined_features)
+        attention_output = attention_output.squeeze(1)
 
-        # Hidden Layers (after attention)
-        hidden1 = self.relu(self.hidden_layer1(attention_output))
+        # Hidden Layers
+        hidden1 = self.relu(self.hidden_layer1(attention_output))  # Use attention_output here
         hidden2 = self.relu(self.hidden_layer2(hidden1))
 
         # Output Layer
         output = self.output_layer(hidden2)
         return output
-
 
 class price_predictor:
     def __init__(self, embedding_dim, hidden_dim, property_dim, community_embedding_length,
@@ -224,7 +219,7 @@ class price_predictor:
                 print("Week Indices Min:", week.min())
                 print("Week Indices Max:", week.max())
                 print(self.model.week_length)
-                predictions = self.model(community, community_features, year,
+                predictions, *_ = self.model(community, community_features, year,
                                             week, property, targets)
 
                 loss = self.criterion(predictions.squeeze(), targets.squeeze())
@@ -244,7 +239,7 @@ class price_predictor:
                     # Unpack the batch
                     community, community_features, year, week, property, targets = batch
                     self.optimizer.zero_grad()
-                    predictions, _ = self.model(community, community_features, year, week, property, targets)
+                    predictions, *_ = self.model(community, community_features, year, week, property, targets)
                     val_loss += loss.item()
 
             train_losses.append(train_loss / len(train_loader))
@@ -267,7 +262,7 @@ class modelmanager:
             'val_losses': [],
             'metrics': {},
             'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S")
-        },
+        }
         self.embedding_dim = None, 
         self.hidden_dim = None, 
         self.property_dim = None
@@ -335,7 +330,6 @@ class modelmanager:
         
         train_losses, val_losses = predictor.train(train_loader, val_loader, epochs = epochs)
 
-
         self.results['train_losses'] = train_losses
         self.results['val_losses'] = val_losses
 
@@ -352,7 +346,7 @@ class modelmanager:
         # # Save predictions to CSV
         #df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
         #                    index=False)
-        return manager
+
 
     def save_model(self, path="outputs/models/"):
         """Save model, config, processor, and results"""
@@ -387,4 +381,5 @@ class modelmanager:
             json.dump(config, f)
 
         print(f"Model and results saved in {path}")
+
 # %%
