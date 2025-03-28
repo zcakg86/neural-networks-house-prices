@@ -6,8 +6,7 @@ from datetime import datetime
 import torch
 import pickle
 import json
-
-
+from torch.utils.data import TensorDataset, Subset
 class modelmanager:
     def __init__(self, dataset, model_name="property_model"):
         self.model = None
@@ -36,17 +35,42 @@ class modelmanager:
         train_dataset, val_dataset = torch.utils.data.random_split(
             self.dataset.tensors, [train_size, val_size]
         )
-        self.num_embedding_comm = train_dataset[:][0].unique().numel()
-        # Create year vocabulary for the TRAINING dataset ONLY
-        train_years = sorted(dataset.tensors[:][2].unique().tolist())
-        train_weeks = sorted(dataset.tensors[:][3].unique().tolist())
-        self.train_year_vocab = {year: idx for idx, year in enumerate(train_years)}
-        self.train_weeks_vocab = {year: idx for idx, year in enumerate(train_weeks)}
-        self.train_years_length = len(train_years)
-        self.train_weeks_length = len(train_weeks)
 
-        dataset.tensors[:][2] = torch.tensor([self.train_year_vocab[year.item()] for year in dataset.tensors[:][2]], dtype=torch.int)
-        dataset.tensors[:][3] = torch.tensor([self.train_year_vocab[week.item()] for week in dataset.tensors[:][3]], dtype=torch.int)
+        self.community_embedding_length = train_dataset[:][0].unique().numel()
+        # Create year vocabulary for the TRAINING dataset
+        train_years = sorted(train_dataset[:][2].unique().tolist())
+
+        self.train_year_vocab = {year: idx for idx, year in enumerate(train_years)}
+        self.train_year_vocab["unknown"] = len(self.train_year_vocab)  # Add "unknown" token
+        self.train_year_length = len(self.train_year_vocab)
+
+        year_train_tensor = torch.tensor([self.train_year_vocab.get(year.item(),self.train_year_vocab['unknown']) for year in train_dataset.dataset.tensors[2]], dtype=torch.int)
+        year_val_tensor = torch.tensor([self.train_year_vocab.get(year.item(),self.train_year_vocab['unknown']) for year in train_dataset.dataset.tensors[2]], dtype=torch.int)
+
+        # Create year vocabulary for the TRAINING dataset
+        train_weeks = sorted(train_dataset[:][3].unique().tolist())
+        
+        self.train_week_vocab = {year: idx for idx, year in enumerate(train_weeks)}
+        self.train_week_vocab["unknown"] = len(self.train_week_vocab)  # Add "unknown" token
+        self.train_week_length = len(self.train_week_vocab)
+
+        week_train_tensor = torch.tensor([self.train_week_vocab.get(week.item(),self.train_week_vocab['unknown']) for week in train_dataset.dataset.tensors[3]], dtype=torch.int)
+        week_val_tensor = torch.tensor([self.train_week_vocab.get(week.item(),self.train_week_vocab['unknown']) for week in train_dataset.dataset.tensors[3]], dtype=torch.int)
+
+        # Create a new TensorDataset with the updated tensors
+        new_train_dataset = list(train_dataset.dataset.tensors)  # Convert tuple to list
+        new_train_dataset[2] = year_train_tensor  # Replace the old tensor with the updated one
+        new_train_dataset[3] = week_train_tensor # Same for weeks
+
+        new_train_dataset = TensorDataset(*new_train_dataset)  # Create new TensorDatase
+        train_dataset = Subset(new_train_dataset, train_dataset.indices)  # Use the original indices
+
+        new_val_dataset = list(val_dataset.dataset.tensors)
+        new_val_dataset[2] = year_val_tensor  # Replace the old tensor with the updated one
+        new_val_dataset[3] = week_val_tensor
+        
+        new_val_dataset = TensorDataset(*new_val_dataset)  # Create new TensorDataset
+        val_dataset = Subset(new_val_dataset, val_dataset.indices)  # Use the original indices
 
 
         train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
@@ -54,9 +78,10 @@ class modelmanager:
 
         # Create and train model. price_predictor contains model spec.
         predictor = price_predictor(embedding_dim, hidden_dim, property_dim,
-                                    self.num_embedding_comm, 
+                                    self.community_embedding_length, 
                                     self.community_feature_dim,
-                                    self.week_length, self.year_length)
+                                    self.train_year_length,
+                                    self.train_week_length)
         
         train_losses, val_losses = predictor.train(train_loader, val_loader, epochs = epochs)
 

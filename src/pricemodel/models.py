@@ -14,13 +14,13 @@ class embeddingmodel(nn.Module):
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
         # Embedding dims
-        self.community_length= community_length
+        self.community_embedding_length= community_length
         self.community_feature_dim = community_feature_dim
         self.week_length = week_length
         self.year_length = year_length
 
         # Embedding Layers
-        self.community_embedding = nn.Embedding(int(self.community_length), embedding_dim)
+        self.community_embedding = nn.Embedding(int(self.community_embedding_length), embedding_dim)
         self.year_embedding = nn.Embedding(int(self.year_length), embedding_dim)
         self.week_embedding = nn.Embedding(int(self.week_length), embedding_dim)
 

@@ -3,19 +3,18 @@ from src.pricemodel.models import *
 import torch 
 
 class price_predictor:
-    def __init__(self, embedding_dim, hidden_dim, property_dim, num_embedding_comm,
+    def __init__(self, embedding_dim, hidden_dim, property_dim, community_embedding_length,
                  community_feature_dim, week_length, year_length):
         self.device = torch.device('mps' if torch.mps.is_available() 
                                    else 'cuda' if torch.cuda.is_available() 
                                    else 'cpu')
         self.model = embeddingmodel(embedding_dim, hidden_dim, property_dim, 
-                                    num_embedding_comm,community_feature_dim, 
-                                    week_length, year_length).to(self.device)
+                                    community_embedding_length,community_feature_dim, 
+                                    year_length, week_length).to(self.device)
         # Specify loss measure
         self.criterion = nn.MSELoss()
         # And Adam optimiser
         self.optimizer = torch.optim.Adam(self.model.parameters(),lr=1e-4)
-        self.num_embedding_comm = num_embedding_comm
     def eval(self):
         self.model.eval()
 
@@ -34,7 +33,10 @@ class price_predictor:
                 self.optimizer.zero_grad()
                 print("Community Indices Min:", community.min())
                 print("Community Indices Max:", community.max())
-                print(self.num_embedding_comm)
+                print(self.model.community_embedding_length)
+                print("Week Indices Min:", week.min())
+                print("Week Indices Max:", week.max())
+                print(self.model.week_length)
                 predictions, _ = self.model(community, community_features, year,
                                             week, property, targets)
 

@@ -112,7 +112,7 @@ class dataset:
                                      torch.tensor(self.dataframe['year'].values, dtype=torch.int),
                                      torch.tensor(self.dataframe['week'].values, dtype=torch.int),
                                      torch.tensor(self.dataframe[['sqft_scaled','sqft_lot_scaled']].values, dtype=torch.float32),
-                                     torch.tensor(self.dataframe['log_price_scaled'].values.reshape(-1, 1), dtype=torch.float32))
+                                     torch.tensor(self.dataframe['log_price_scaled'].values, dtype=torch.float32))
 
 # Class for working with data.
 class data_processor:
