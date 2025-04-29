@@ -10,7 +10,7 @@ Analysis and model performance to be presented with Panel.
 
 ## Methods
 * H3 Index for spatial representation
-* Girvan-Newman community detection to allocate each H3 index to a community.
+* Girvan-Newman graph based community detection to allocate each H3 index to a community.
 * Community embedding layer
 * Temporal embedding layer based on YYYYMM and DD.
 * Property Attribute data
