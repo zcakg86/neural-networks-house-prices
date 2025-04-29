@@ -4,7 +4,7 @@ Repository for training neural networks to observe markets and provide price pre
 Analysis and model performance to be presented with Panel.
 
 ## Aims
-* Implement location-specific embedding through spatial features and community detection, that can estimate prices without bias across King County.
+* Implement location-specific embedding through spatial features and community detection, to recuce spatial bias in price estimation across King County.
 * Provide accurate estimates throughout time.
 * Deliver dashboard with panel that can be used to present market analysis found through the model weights.
 
