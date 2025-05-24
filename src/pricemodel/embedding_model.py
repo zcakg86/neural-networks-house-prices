@@ -14,7 +14,7 @@ import json
 class dataset:
     def __init__(self):
         self.length = None
-        self.community_length = None
+        self.n_communities = None
         self.year_length = None
         self.week_length = None
         self.scalers = {}
@@ -182,8 +182,8 @@ class embeddingmodel(nn.Module):
 
         # Output Layer
         output = self.output_layer(hidden2)
-        return output
-
+        print('output shape', output.shape)
+        return output, attention_output.shape
 class price_predictor:
     def __init__(self, embedding_dim, hidden_dim, property_dim, community_embedding_length,
                  community_feature_dim, year_length, week_length):
@@ -196,7 +196,7 @@ class price_predictor:
         # Specify loss measure
         self.criterion = nn.MSELoss()
         # And Adam optimiser
-        self.optimizer = torch.optim.Adam(self.model.parameters(),lr=1e-4)
+        self.optimizer = torch.optim.Adam(self.model.parameters(),lr=1e-6)
     def eval(self):
         self.model.eval()
 
@@ -207,27 +207,39 @@ class price_predictor:
             # Training
             self.model.train()
             train_loss = 0
-            for batch in train_loader:
-                # Move each tensor in the batch to the device
-                batch = tuple(t.to(self.device) for t in batch)
-                # Unpack the batch
-                community, community_features, year, week, property, targets = batch
-                self.optimizer.zero_grad()
-                print("Community Indices Min:", community.min())
-                print("Community Indices Max:", community.max())
-                print(self.model.community_embedding_length)
-                print("Week Indices Min:", week.min())
-                print("Week Indices Max:", week.max())
-                print(self.model.week_length)
-                predictions, *_ = self.model(community, community_features, year,
-                                            week, property, targets)
+            with torch.autograd.detect_anomaly():
+                for batch in train_loader:
+                    # Move each tensor in the batch to the device
+                    batch = tuple(t.to(self.device) for t in batch)
+                    # Unpack the batch
+                    community, community_features, year, week, property, targets = batch
+                    self.optimizer.zero_grad()
+                    print("Community Indices Min:", community.min())
+                    print("Community Indices Max:", community.max())
+                    print(self.model.community_embedding_length)
+                    print("Week Indices Min:", week.min())
+                    print("Week Indices Max:", week.max())
+                    print(self.model.week_length)
+                    print("Size of batch: ", targets.size())
+                    predictions, _ = self.model(community, community_features, year,
+                                                week, property, targets)
+                    if torch.isnan(predictions).any():
+                        print("NaN detected in outputs. Skipping this iteration.")
+                        continue
+                    print("shape of attention output",_)
+                    print('predictions shape', predictions.shape)
+                    print('predictions')
+                    print(predictions.squeeze())
+                    print('targets')
+                    print(targets)
+                    loss = self.criterion(predictions.squeeze(), targets)
+                    print('loss')
+                    print(loss)
+                    loss.backward()
+                    self.optimizer.step()
 
-                loss = self.criterion(predictions.squeeze(), targets.squeeze())
-                loss.backward()
-                self.optimizer.step()
-
-                train_loss += loss.item()
-                print(train_loss)
+                    train_loss += loss.item()
+                    print(train_loss)
 
             # Validation
             self.model.eval()
@@ -239,7 +251,7 @@ class price_predictor:
                     # Unpack the batch
                     community, community_features, year, week, property, targets = batch
                     self.optimizer.zero_grad()
-                    predictions, *_ = self.model(community, community_features, year, week, property, targets)
+                    predictions, _ = self.model(community, community_features, year, week, property, targets)
                     val_loss += loss.item()
 
             train_losses.append(train_loss / len(train_loader))
@@ -263,8 +275,8 @@ class modelmanager:
             'metrics': {},
             'timestamp': datetime.now().strftime("%Y%m%d_%H%M%S")
         }
-        self.embedding_dim = None, 
-        self.hidden_dim = None, 
+        self.embedding_dim = None
+        self.hidden_dim = None
         self.property_dim = None
         self.n_communities = self.dataset.n_communities
         self.community_feature_dim = self.dataset.community_feature_dim
@@ -337,8 +349,10 @@ class modelmanager:
         self.hidden_dim = hidden_dim, 
         self.property_dim = property_dim
 
+        self.model = predictor.model
+
         # Save everything
-        self.save_model()
+        #self.save_model()
         # Add predictions to data
         #df_with_pred = manager.add_predictions_to_data(
         #)
