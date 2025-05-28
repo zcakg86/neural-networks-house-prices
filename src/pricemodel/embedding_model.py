@@ -76,12 +76,13 @@ class dataset:
             'sale_price': ['mean', 'median', 'std'],
             'sqft' : ['mean'],
             'beds' : 'median'
-            }).to_dict('index')
-        
+            })
+
+        community_dict = self.community_df.to_dict('index')
         # Flatten the dictionary values
-        for key, value in self.community_df.items():
-            self.community_df[key] = [v for sublist in value.values() for v in (sublist if isinstance(sublist, list) else [sublist])]
-        self.community_array = np.array([self.community_df[(c, y)] for c, y in zip(self.dataframe['community_index'], self.dataframe['year'])])
+        for key, value in community_dict.items():
+            community_dict[key] = [v for sublist in value.values() for v in (sublist if isinstance(sublist, list) else [sublist])]
+        self.community_array = np.array([community_dict[(c, y)] for c, y in zip(self.dataframe['community_index'], self.dataframe['year'])])
         self.community_feature_dim = self.community_array.shape[1]
 
     def _processor(self, mode = 'train'):
@@ -182,7 +183,7 @@ class embeddingmodel(nn.Module):
 
         # Output Layer
         output = self.output_layer(hidden2)
-        print('output shape', output.shape)
+        #print('output shape', output.shape)
         return output, attention_output.shape
 class price_predictor:
     def __init__(self, embedding_dim, hidden_dim, property_dim, community_embedding_length,
@@ -214,27 +215,29 @@ class price_predictor:
                     # Unpack the batch
                     community, community_features, year, week, property, targets = batch
                     self.optimizer.zero_grad()
-                    print("Community Indices Min:", community.min())
-                    print("Community Indices Max:", community.max())
-                    print(self.model.community_embedding_length)
-                    print("Week Indices Min:", week.min())
-                    print("Week Indices Max:", week.max())
-                    print(self.model.week_length)
-                    print("Size of batch: ", targets.size())
+
+                    # print(self.model.community_embedding_length)
+                    # print("Week Indices Min:", week.min())
+                    # print("Week Indices Max:", week.max())
+                    # print(self.model.week_length)
+                    # print("Size of batch: ", targets.size())
+                    #print(community)
                     predictions, _ = self.model(community, community_features, year,
                                                 week, property, targets)
+                    print(f'attention shape{_}')
                     if torch.isnan(predictions).any():
                         print("NaN detected in outputs. Skipping this iteration.")
                         continue
-                    print("shape of attention output",_)
-                    print('predictions shape', predictions.shape)
-                    print('predictions')
-                    print(predictions.squeeze())
-                    print('targets')
-                    print(targets)
+
+                    # print("shape of attention output",_)
+                    # print('predictions shape', predictions.shape)
+                    # print('predictions')
+                    # print(predictions.squeeze())
+                    # print('targets')
+                    # print(targets)
                     loss = self.criterion(predictions.squeeze(), targets)
-                    print('loss')
-                    print(loss)
+                    print(f'Train Community Indices Min: {community.min().item()} and ',
+                          f'Max: {community.max().item()}')
                     loss.backward()
                     self.optimizer.step()
 
@@ -250,6 +253,8 @@ class price_predictor:
                     batch = tuple(t.to(self.device) for t in batch)
                     # Unpack the batch
                     community, community_features, year, week, property, targets = batch
+                    print(f'Val Community Indices Min: {community.min().item()} and ',
+                          f'Max: {community.max().item()}')
                     self.optimizer.zero_grad()
                     predictions, _ = self.model(community, community_features, year, week, property, targets)
                     val_loss += loss.item()
@@ -360,6 +365,89 @@ class modelmanager:
         # # Save predictions to CSV
         #df_with_pred.to_csv(f'outputs/results/predictions_{manager.results["timestamp"]}.csv',
         #                    index=False)
+
+    def add_predictions_to_data(self):
+        """Add model predictions to dataframe"""
+        self.model.eval()
+        predictions = []
+        prediction_indices = []
+
+        # Create DataLoader for prediction
+        dataset = maketensor(sequences, spatial_features, property_features,
+                                  np.zeros(len(sequences)))  # dummy targets
+        loader = DataLoader(dataset, batch_size=32)
+        
+        current_idx = 0
+
+        with torch.no_grad():
+            for seq, spat, prop, _ in loader:
+                # Access the underlying model through self.model.model
+                # Attach data to device
+                pred, _ = self.model.model(
+                    seq.to(self.model.device),
+                    spat.to(self.model.device),
+                    prop.to(self.model.device)
+                )
+                # Execute
+                batch_predictions = pred.cpu().numpy()
+                for i, p in enumerate(batch_predictions):
+                    if not np.isnan(p).any():  # Check if prediction was actually made
+                        predictions.append(p)
+                        prediction_indices.append(current_idx + i)
+                
+                current_idx += len(seq)
+
+        # Reshape predictions
+        predictions = np.array(predictions).reshape(-1, 1)
+
+        # Inverse transform using temporal_scaler
+        sequence_shape = sequences.shape
+        dummy_sequence = np.zeros((predictions.shape[0], sequence_shape[2]))
+        dummy_sequence[:, 0] = predictions.ravel()  # Put predictions in first column
+        predictions = self.processor.scalers['sequences'].inverse_transform(dummy_sequence)[:, 0]
+        # Add predictions to dataframe
+        # Get existing dataframe
+        df_with_pred = df.copy()
+
+        # Initialize predicted_price column with NaN
+        df_with_pred['predicted_value'] = pd.NA
+        df_with_pred['predicted_price'] = pd.NA
+
+        # Create a mapping of sequence index to original dataframe index
+        # This should come from your data preparation step
+        if hasattr(self.processor, 'indices'):
+            sequence_to_df_idx = self.processor.indices
+            
+            # Map prediction indices to original dataframe indices
+            df_indices = [sequence_to_df_idx[i] for i in prediction_indices]
+            
+            # Assign predictions to the correct rows
+            df_with_pred.iloc[df_indices, df_with_pred.columns.get_loc('predicted_value')] = predictions
+            df_with_pred.iloc[df_indices, df_with_pred.columns.get_loc('predicted_price')] = np.exp(predictions)
+        else:
+            print("Warning: No index mapping found. Using sequential assignment.")
+            df_with_pred.iloc[prediction_indices, df_with_pred.columns.get_loc('predicted_value')] = predictions
+            df_with_pred.iloc[prediction_indices, df_with_pred.columns.get_loc('predicted_price')] = np.exp(predictions)
+
+        # Add prediction error metrics where we have both actual and predicted prices
+        mask = df_with_pred['predicted_price'].notna()
+        df_with_pred.loc[mask, 'price_error'] = (
+                df_with_pred.loc[mask, 'predicted_price'] -
+                df_with_pred.loc[mask, 'sale_price']
+        )
+        df_with_pred.loc[mask, 'price_error_pct'] = (
+                df_with_pred.loc[mask, 'price_error'] /
+                df_with_pred.loc[mask, 'sale_price'] * 100
+        )
+
+        # Print some debugging information
+        print(f"Original dataframe shape: {df.shape}")
+        print(f"Number of predictions: {len(predictions)}")
+        print(f"Number of non-null predictions: {df_with_pred['predicted_price'].notna().sum()}")
+        print(f"Mean Absolute Percentage Error: {df_with_pred['price_error_pct'].abs().mean()}")
+
+        return df_with_pred
+
 
 
     def save_model(self, path="outputs/models/"):

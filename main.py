@@ -10,12 +10,12 @@ data._get_community_features()
 # Scale and Create tensors
 data._processor(mode = 'train')
 
-
 embedding_dim=8
 hidden_dim=8
 property_dim=2
 
-
+#%%
+data.community_vocab
 #%%
 model = modelmanager(data)
 model.train_model(embedding_dim, hidden_dim, property_dim, epochs = 1)
