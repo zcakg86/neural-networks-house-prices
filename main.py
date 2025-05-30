@@ -17,8 +17,19 @@ property_dim=2
 #%%
 data.community_vocab
 #%%
-model = modelmanager(data)
-model.train_model(embedding_dim, hidden_dim, property_dim, epochs = 1)
-
+data.year_vocab
 #%%
+model = modelmanager(data,embedding_dim, hidden_dim, property_dim)
+model.train_model(epochs = 5)
+
+model.add_predictions_to_data()
+#%%
+data2 = data._processor(mode= 'test')
+# %%
+for i in data.tensors[:][0]:  
+    print(data.tensors[i][0])
+
+# %%
+for i in model.dataset.tensors[:][0]:  
+    print(model.dataset.tensors[i][0])
 # %%
