@@ -255,7 +255,6 @@ class price_predictor:
                     community, community_features, year, week, property, targets = batch
                     print(f'Val Community Indices Min: {community.min().item()} and ',
                           f'Max: {community.max().item()}')
-                    self.optimizer.zero_grad()
                     predictions, _ = self.model(community, community_features, year, week, property, targets)
                     val_loss += loss.item()
 
