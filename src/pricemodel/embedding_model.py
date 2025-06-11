@@ -85,10 +85,13 @@ class dataset:
         self.community_array = np.array([community_dict[(c, y)] for c, y in zip(self.dataframe['community_index'], self.dataframe['year'])])
         self.community_feature_dim = self.community_array.shape[1]
 
-    def _processor(self, mode = 'train'):
-
+    def _processor(self, scale_mode = "fit"):
+        """ Function transform and construct TensorDataset from dataframe features
+            Parameters:
+                scale_mode (str): If scalers need to be fit ("fit") on data or read from file for transformation only.
+        """
         for feature in ['sqft','sqft_lot','log_price']: # List the features to scale
-            if mode == "train":
+            if scale_mode == "fit":
                 self.scalers[feature] = StandardScaler() # Create a new scaler for each feature
                 self.dataframe[f"{feature}_scaled"] = self.scalers[feature].fit_transform(self.dataframe[[feature]]) # Fit and transform
                 # Save the scaler
@@ -102,7 +105,7 @@ class dataset:
                 self.dataframe[f"{feature}_scaled"] = self.scalers[feature].transform(self.dataframe[[feature]]) # Fit and transform
 
         # Community df
-        if mode == 'train':
+        if scale_mode == "fit":
             self.scalers['community'] = StandardScaler()
             self.community_array = self.scalers[feature].fit_transform(self.community_array)
             joblib.dump(self.scalers['community'], "communities_scaler.pkl")
